@@ -572,7 +572,8 @@ function pmprocc_options_page()
 		{
     			foreach ($ex->getErrors() as $error) 
     			{
-     	   		
+					$msg = $error['error_message'];
+					$msgt = "pmpro_error";					
     			}
     			
 		}
@@ -614,14 +615,14 @@ function pmprocc_options_page()
 	<h2>PMPro Constant Contact Integration Options</h2>		
 	
 	<?php if(!empty($msg)) { ?>
-		<div class="message <?php echo $msgt; ?>"><p><?php echo $msg; ?></p></div>
+		<div class="pmpro_message <?php echo $msgt; ?>"><p><?php echo $msg; ?></p></div>
 	<?php } ?>
 	
 	<form action="options.php" method="post">
 		
 		<p>This plugin will integrate your site with Constant Contact. You can choose one or more Constant Contact lists to have users subscribed to when they signup for your site.</p>
 		<p>If you have <a href="http://www.paidmembershipspro.com">Paid Memberships Pro</a> installed, you can also choose one or more Constant Contact lists to have members subscribed to for each membership level.</p>
-		<p>Don't have a Constant Contact account? <a href="http://www.constantcontact.com" target="_blank">Get one here</a>. It's free.</p>
+		<p>Don't have a Constant Contact account? <a href="http://www.constantcontact.com/features/signup.jsp?pn=strangerstudios" target="_blank">Get one here</a>. It's free.</p>
 		
 		<?php settings_fields('pmprocc_options'); ?>
 		<?php do_settings_sections('pmprocc_options'); ?>
