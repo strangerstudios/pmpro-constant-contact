@@ -3,7 +3,7 @@
 Plugin Name: PMPro Constant Contact Integration
 Plugin URI: http://www.paidmembershipspro.com/pmpro-constantcontact/
 Description: Sync your WordPress users and members with Constant Contact lists.
-Version: 0.2
+Version: 1.0
 Author: Stranger Studios
 Author URI: http://www.strangerstudios.com
 */
