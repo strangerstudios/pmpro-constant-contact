@@ -3,7 +3,7 @@ Contributors: strangerstudios
 Tags: pmpro, paid memberships pro, constant contact, email marketing
 Requires at least: 3.4
 Tested up to: 3.8.1
-Stable tag: 1.0
+Stable tag: 1.0.1
 
 Sync your WordPress users and members with Constant Contact lists.
 
@@ -33,6 +33,9 @@ Please post it in the issues section of GitHub and we'll fix it as soon as we ca
 Please visit our premium support site at http://www.paidmembershipspro.com for more documentation and our support forums.
 
 == Changelog ==
+= 1.0.1 =
+* Fixed warnings when PMPro is not also installed.
+
 = 1.0 =
 * Released to the WordPress repository.
 
