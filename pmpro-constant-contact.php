@@ -3,7 +3,7 @@
 Plugin Name: PMPro Constant Contact Integration
 Plugin URI: http://www.paidmembershipspro.com/pmpro-constantcontact/
 Description: Sync your WordPress users and members with Constant Contact lists.
-Version: 1.0.1
+Version: 1.0.2
 Author: Stranger Studios
 Author URI: http://www.strangerstudios.com
 */
@@ -19,11 +19,19 @@ use Ctct\Components\Contacts\ContactList;
 use Ctct\Components\Contacts\EmailAddress;
 use Ctct\Exceptions\CtctException;
 
+// Unsubscribe constants.
+define('UNSUB_NO', 0);
+define('UNSUB_YES', 1);
+define('UNSUB_MANAGED', 2);
+
 //init
 function pmprocc_init()
 {
-	//include ConstantContact Class if we don't have it already
-	require_once dirname(__FILE__) . '/includes/Ctct/autoload.php';
+	//error_log("PMPROCC_INIT");
+	// Include ConstantContact Class if we don't have it already.
+	if (!class_exists('Ctct\\ConstantContact')) {
+		require_once dirname(__FILE__) . '/includes/Ctct/autoload.php';
+	}
 
 	//get options for below
 	$options = get_option("pmprocc_options");
@@ -69,6 +77,7 @@ function pmprocc_pmpro_after_checkout($user_id)
 //subscribe users when they register
 function pmprocc_user_register($user_id)
 {
+	//error_log("registering user $user_id");
 	clean_user_cache($user_id);
 	
 	$options = get_option("pmprocc_options");
@@ -79,35 +88,44 @@ function pmprocc_user_register($user_id)
 		//get user info
 		$list_user = get_userdata($user_id);
 		
-		//subscribe to each list
+		//get CC API object
 		$api = new ConstantContact($options['api_key']);
 		
-		foreach($options['users_lists'] as $list)
-		{					
-			//subscribe them
-			try
+		//subscribe them
+		try
+		{
+			// check to see if a contact with the email addess already exists in the account
+			$response = $api->getContactByEmail($options['access_token'], $list_user->user_email);
+			$is_new_contact = empty($response->results);
+			// create a new contact if one does not exist
+			if ($is_new_contact)
 			{
-        			// check to see if a contact with the email addess already exists in the account
-        			$response = $api->getContactByEmail($options['access_token'], $list_user->user_email);
-
-		        	// create a new contact if one does not exist
-        			if (empty($response->results))
-        			{
-            			$contact = new Contact();
-						$contact->addEmail($list_user->user_email);
-						$contact->addList($list->id);
-						$contact->first_name = $list_user->first_name;
-						$contact->last_name = $list_user->last_name;
-						$api->addContact($options['access_token'], $contact); 
-					}
-        		}
-        		
-        		//Catch any errors so the user can't see them.
-        		catch (CtctException $ex)
-        		{
-        			//Add a WordPress Error Message?
-        		}
-	
+				$contact = new Contact();
+				$contact->addEmail($list_user->user_email);
+				$contact->first_name = $list_user->first_name;
+				$contact->last_name = $list_user->last_name;
+			}
+			else {
+				$contact = $response->results[0];
+			}
+			// Add each of our default users_lists to 
+			foreach($options['users_lists'] as $list)
+			{					
+				$contact->addList($list->id);
+			}
+			if ($is_new_contact) {
+				$api->addContact($options['access_token'], $contact); 
+			}
+			else {
+				$api->updateContact($options['access_token'], $contact);
+			}
+		}
+		
+		//Catch any errors so the user can't see them.
+		catch (CtctException $ex)
+		{
+			// Log the error.
+			error_log("error adding user to Constant Contact: $ex");
 		}
 	}
 }
@@ -115,15 +133,29 @@ function pmprocc_user_register($user_id)
 //subscribe new members (PMPro) when they register
 function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 {
+
 	clean_user_cache($user_id);
 	
 	global $pmprocc_levels;
 	$options = get_option("pmprocc_options");
+	//error_log("AFTER_CHANGE_MEMBERSHIP: unsubscribe level = " . $options['unsubscribe']);
+	
+	
 	$all_lists = get_option("pmprocc_all_lists");	
-		
+	
+	// Can't do anything without an api key.
+	if (empty($options['api_key'])) {
+		error_log("***** AFTER_CHANGE_MEMBERSHIP: CANNOT CONTINUE: no api_key ******");
+		return;
+	}
+	
+	
 	//should we add them to any lists?
-	if(!empty($options['level_' . $level_id . '_lists']) && !empty($options['api_key']))
+	if(!empty($options['level_' . $level_id . '_lists']))
 	{
+		//error_log("AFTER_CHANGE_MEMBERSHIP: subscribing to CC ID = " . print_r($options['level_' . $level_id . '_lists'], true));
+		
+		
 		//get user info
 		$list_user = get_userdata($user_id);		
 		
@@ -137,12 +169,10 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			//subscribe them
 			try
 			{
-				// check to see if a contact with the email addess already exists in the account
+				// Check to see if a contact with the email addess already exists in the account
 				$response = $api->getContactByEmail($options['access_token'], $list_user->user_email);
 				
-				//?? What should we do if the email address already exists?
-				
-				// create a new contact if one does not exist
+				// Create a new contact if one does not exist
 				if (empty($response->results))
 				{
 					$contact = new Contact();
@@ -154,6 +184,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 				}      			
 				else
 				{
+					// Update the existing contact.
 					$contact = $response->results[0];
 					$contact->addList($list);
 					$contact->first_name = $list_user->first_name;
@@ -166,26 +197,43 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			//Catch any errors so the user can't see them.
 			catch (CtctException $ex)
 			{
-				//WordPress Error Message?
+				// Log the error.
+				error_log("error setting Constant Contact list to user: $ex");
 			}
 		}
 		
-		//unsubscribe them from lists not selected
-		if($options['unsubscribe'])
+		//unsubscribe them from lists not selected.
+		
+		if($options['unsubscribe'] !== UNSUB_NO)
 		{
-			foreach($all_lists as $list)
+			
+			switch($options['unsubscribe']) {
+				case UNSUB_YES:
+					//error_log("getting ALL ids to remove");
+					$list_ids_to_remove = pluck('id', $all_lists);
+					break;
+				case UNSUB_MANAGED:
+					//error_log("getting MANAGED ids to remove");
+					$list_ids_to_remove = flatten(getSubarrayExcept($options, 'level_' . $level_id . '_lists', '^level_\\d+_lists$'));
+					break;
+				default:
+					throw new Exception("unhandled unsubscribe option " . $options['unsubscribe']);
+			}
+			//error_log("IDs to Remove = " . print_r($list_ids_to_remove, true));
+			
+			foreach($list_ids_to_remove as $id)
 			{
-				if(!in_array($list[id], $options['level_' . $level_id . '_lists']))
+				if(!in_array($id, $options['level_' . $level_id . '_lists']))
 				{
-					deleteFromList($options['access_token'], $list_user->user_email, $list[id]);
+					deleteFromList($options['access_token'], $list_user->user_email, $id);
 				}
 			}
 		}
 	}
-	elseif(!empty($options['api_key']) )
+	else
 	{
 		//now they are a normal user should we add them to any lists?
-		if(!empty($options['users_lists']) && !empty($options['api_key']))
+		if(!empty($options['users_lists']))
 		{
 			//get user info
 			$list_user = get_userdata($user_id);
@@ -229,38 +277,54 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 				//Catch any errors so the user can't see them.
 				catch (CtctException $ex)
 				{
-					//WordPress Error Message?
+					// Log the error.
+					error_log("error adding user to the normal constant contact list Constant Contact: $ex");
 				}						
 			}
 			
 			//unsubscribe from any list not assigned to users
-			if($options['unsubscribe'])
+			if($options['unsubscribe'] !== UNSUB_NO)
 			{
-				foreach($all_lists as $list)
+				switch($options['unsubscribe']) {
+					case UNSUB_YES:
+						$list_ids_to_remove = pluck('id', $all_lists);
+						break;
+					case UNSUB_MANAGED:
+						$list_ids_to_remove = flatten(getSubarrayExcept($options, '', '^level_\\d+_lists$'));
+						break;
+					default:
+						throw new Exception("unhandled unsubscribe option " . $options['unsubscribe']);
+				}
+				
+				foreach($list_ids_to_remove as $id)
 				{
-					if(!in_array($list[id], $options['users_lists']))
+					if(!in_array($id, $options['users_lists']))
 					{
-						deleteFromList($options['access_token'], $list_user->user_email, $list[id]);
-					}	
+						deleteFromList($options['access_token'], $list_user->user_email, $id);
+					}
 				}
 			}
 		}
-		else
+		else // we don't have a "users list" defined.
 		{
 			//some memberships are on lists. assuming the admin intends this level to be unsubscribed from everything
-			if($options['unsubscribe'])
+			//unsubscribe from any list not assigned to users
+			if($options['unsubscribe'] !== UNSUB_NO)
 			{
-				if(is_array($all_lists))
+				switch($options['unsubscribe']) {
+					case UNSUB_YES:
+						$list_ids_to_remove = pluck('id', $all_lists);
+						break;
+					case UNSUB_MANAGED:
+						$list_ids_to_remove = flatten(getSubarrayExcept($options, '', '^level_\\d+_lists$'));
+						break;
+					default:
+						throw new Exception("unhandled unsubscribe option " . $options['unsubscribe']);
+				}
+				
+				foreach($list_ids_to_remove as $id)
 				{
-					//get user info
-					$list_user = get_userdata($user_id);
-					
-					//unsubscribe to each list
-					$api = new ConstantContact($options['api_key']);
-					foreach($all_lists as $list)
-					{
-						deleteFromList($options['access_token'], $list_user->user_email, $list[id]);
-					}					
+					deleteFromList($options['access_token'], $list_user->user_email, $id);
 				}
 			}
 		}
@@ -271,42 +335,23 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 function pmprocc_profile_update($user_id, $old_user_data)
 {
 	$new_user_data = get_userdata($user_id);
-	if(true || $new_user_data->user_email != $old_user_data->user_email)
+	if($new_user_data->user_email != $old_user_data->user_email)
 	{			
 		//get all lists
 		$options = get_option("pmprocc_options");
 		$api = new ConstantContact($options['api_key']);
 		
-		$lists = $api->getLists($options['access_token']);
+		//$lists = $api->getLists($options['access_token']);
 		
 		$response = $api->getContactByEmail($options['access_token'], $old_user_data->user_email);
 		$contact = $response->results[0];
 				
-		if(!empty($lists) && !empty($contact))
+		if(!empty($contact))
 		{ 
-			foreach($lists as $list)
-			{
-				$contact->addList($list->id);
-				$contact->first_name = $new_user_data->first_name;
-				$contact->last_name = $new_user_data->last_name;
-				$contact->email_addresses[0]->email_address = $new_user_data->user_email;
-								
-				//filter
-				$custom_fields = apply_filters("pmpro_constant_contact_custom_fields", array(), $new_user_data);
-				if(!empty($custom_fields))
-				{
-					foreach($custom_fields as $field)
-					{
-						$custom_field = new CustomField();
-						$custom_field->name = $field['name'];
-						$custom_field->value = $field['value'];
-												
-						$contact->addCustomField($custom_field);
-					}
-				}							
-						
-				$api->updateContact($options['access_token'], $contact, true);
-			}		
+			$contact->first_name = $new_user_data->first_name;
+			$contact->last_name = $new_user_data->last_name;
+			$contact->email_addresses[0]->email_address = $new_user_data->user_email;
+			$api->updateContact($options['access_token'], $contact, true);
 		}		
 	}
 }
@@ -343,10 +388,7 @@ add_action("admin_init", "pmprocc_admin_init");
 function pmprocc_getPMProLevels()
 {	
 	global $pmprocc_levels, $wpdb;
-	if(function_exists('pmpro_activation'))
-		$pmprocc_levels = $wpdb->get_results("SELECT * FROM $wpdb->pmpro_membership_levels ORDER BY id");			
-	else
-		$pmprocc_levels = array();
+	$pmprocc_levels = $wpdb->get_results("SELECT * FROM $wpdb->pmpro_membership_levels ORDER BY id");			
 }
 
 //options sections
@@ -460,10 +502,17 @@ function pmprocc_option_unsubscribe()
 	$options = get_option('pmprocc_options');	
 	?>
 	<select name="pmprocc_options[unsubscribe]">
-		<option value="0" <?php selected($options['unsubscribe'], 0);?>>No</option>
-		<option value="1" <?php selected($options['unsubscribe'], 1);?>>Yes</option>		
+		<option value="<?php echo UNSUB_MANAGED ?>" <?php selected($options['unsubscribe'], 2);?>>Just those managed by PMPro Constant Contact
+		<option value="<?php echo UNSUB_YES ?>" <?php selected($options['unsubscribe'], 1);?>>All</option>		
+		<option value="<?php echo UNSUB_NO ?>" <?php selected($options['unsubscribe'], 0);?>>No</option>
 	</select>
-	<small>Recommended: Yes. However, if you manage multiple lists in Constant Contact and have users subscribe outside of WordPress, you may want to choose No so contacts aren't unsubscribed from other lists when they register on your site.</small>
+	<small>
+		<ul>
+		<li><b>No:</b> PMPro Constant Contact will not attempt to remove contacts from lists.</li>
+		<li><b>Just those managed by PMPro Constant Contact:</b> <i>Recommended</i> Contacts will be removed from all lists that are associated with membership levels.</li>
+		<li><b>Yes:</b> Contacts will be removed from every list in Constant Contact, even those not associated with membership levels.</li>
+		</ul>
+	</small>
 	<?php
 }
 
@@ -551,12 +600,12 @@ function pmprocc_options_page()
 	//defaults
 	if(empty($options))
 	{
-		$options = array("unsubscribe"=>1);
+		$options = array("unsubscribe"=>UNSUB_MANAGED);
 		update_option("pmprocc_options", $options);
 	}
 	elseif(!isset($options['unsubscribe']))
 	{
-		$options['unsubscribe'] = 1;
+		$options['unsubscribe'] = UNSUB_MANAGED;
 		update_option("pmprocc_options", $options);
 	}	
 	
@@ -653,12 +702,12 @@ function pmprocc_activation()
 	//defaults
 	if(empty($options))
 	{
-		$options = array("unsubscribe"=>1);
+		$options = array("unsubscribe"=>UNSUB_MANAGED);
 		update_option("pmprocc_options", $options);
 	}
 	elseif(!isset($options['unsubscribe']))
 	{
-		$options['unsubscribe'] = 1;
+		$options['unsubscribe'] = UNSUB_MANAGED;
 		update_option("pmprocc_options", $options);
 	}
 }
@@ -667,8 +716,7 @@ register_activation_hook(__FILE__, "pmprocc_activation");
 
 function isMemberOfList(Contact $contact, $list_id)
 {
-	
-	
+	//error_log("PMPCC: contact's lists = " . print_r($contact->lists, true));
 	foreach($contact->lists as $key => $value)
 	{
 		if($value->id == $list_id)
@@ -676,7 +724,6 @@ function isMemberOfList(Contact $contact, $list_id)
 	}
 	
 	return false;
-
 }
 
 function deleteFromList($access_token, $email, $list_id)
@@ -684,6 +731,8 @@ function deleteFromList($access_token, $email, $list_id)
 	
 	try
 	{
+		//error_log("PMPCC: Deleting $email from list $list_id");
+		
 		//get options
 		$options = get_option("pmprocc_options");	
 		
@@ -695,14 +744,54 @@ function deleteFromList($access_token, $email, $list_id)
 		{
 			$contact = $response->results[0];
 
-			if(isMemberofList($contact, $list_id))
+			if(isMemberofList($contact, $list_id)) {
 				$api->deleteContactFromList($access_token,$contact, $list_id);
+			}
+			else {
+				//error_log("PMPCC: Email $email is not a member of list $list_id");
+			}
+		}
+		else {
+			//error_log("PMPCC: Email $email not found!");
 		}
 	}
 	
 	catch (CtctException $ex)
 	{
-       	//Add a WordPress Error Message?
+		// Log the error.
+		error_log("error deleting list from user: $ex");
 	}
 
+}
+
+function getSubarrayExcept($input, $except_key, $search_regex = "")
+{
+	//error_log("PMPCC: GETSUBARRAYEXCEPT " . print_r($input, true) . ", except $except_key, search_regex $search_regex");
+	$tmpkeys = array();
+	$keys = array_keys($input);
+	
+	if ($search_regex === "") {
+		$tmpkeys = $keys;
+	}
+	else {
+		foreach ($keys as $k)
+		{
+			if (preg_match("/$search_regex/", $k) === 1) $tmpkeys[] = $k;
+		}
+	}
+	$returnVal = array_intersect_key($input, array_flip($tmpkeys));
+	if (array_key_exists($except_key, $returnVal)) unset($returnVal[$except_key]);
+
+	return $returnVal;
+}
+function flatten(array $input) 
+{ 
+	$output = iterator_to_array(new RecursiveIteratorIterator(new RecursiveArrayIterator($input)), FALSE);
+	return $output;
+}
+function pluck($key, $data) {
+    return array_reduce($data, function($result, $array) use($key) {
+        isset($array[$key]) && $result[] = $array[$key];
+        return $result;
+    }, array());
 }
