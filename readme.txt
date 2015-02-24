@@ -1,9 +1,9 @@
-=== PMPro Constant Contact ===
+=== Paid Memberships Pro - Constant Contact Add On ===
 Contributors: strangerstudios
 Tags: pmpro, paid memberships pro, constant contact, email marketing
 Requires at least: 3.4
-Tested up to: 3.8.1
-Stable tag: 1.0.1
+Tested up to: 4.1.1
+Stable tag: 1.0.2
 
 Sync your WordPress users and members with Constant Contact lists.
 
@@ -32,7 +32,17 @@ Please post it in the issues section of GitHub and we'll fix it as soon as we ca
 
 Please visit our premium support site at http://www.paidmembershipspro.com for more documentation and our support forums.
 
+== Screenshots ==
+
+1. General settings for all members/subscribers list and unsubscribe rules.
+2. Membership-level specific list subscription settings.
+
 == Changelog ==
+= 1.0.2 =
+* Overhaul by Michael Roufa.
+* Added options to only unsub from PMPro-related lists. (Thanks, Michael Roufa)
+* Fixed bug where updates on the profile page led to members being added to all CC lists. (Thanks, Michael Roufa)
+
 = 1.0.1 =
 * Fixed warnings when PMPro is not also installed.
 

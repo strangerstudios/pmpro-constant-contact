@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: PMPro Constant Contact Integration
+Plugin Name: Paid Memberships Pro - Constant Contact Add On
 Plugin URI: http://www.paidmembershipspro.com/pmpro-constantcontact/
 Description: Sync your WordPress users and members with Constant Contact lists.
 Version: 1.0.2
@@ -591,8 +591,8 @@ add_action('admin_menu', 'pmprocc_admin_add_page');
 function pmprocc_options_page()
 {
 	//get options
-	$options = get_option("pmprocc_options");	
-
+	$options = get_option("pmprocc_options", array('api_key'=>'', 'access_token'=>'', 'unsubscribe'=>''));
+	
 	$api = new ConstantContact($options['api_key']);
 
 	global $pmprocc_lists;
@@ -630,7 +630,8 @@ function pmprocc_options_page()
     			
 		}
 		
-		$pmprocc_lists = $lists;								
+		if(!empty($lists))
+			$pmprocc_lists = $lists;								
 		$all_lists = array();
 		
 		if(!empty($pmprocc_lists ))
@@ -653,14 +654,12 @@ function pmprocc_options_page()
 		{
 			//Wordpress Error Message.
 			$msg = sprintf( __( 'Sorry, but Constant Contact was unable to verify your API key or Access Token. Please try entering your API key and Access Token again.', 'pmpro-contantcontact' ), "" );
-			add_settings_error( 'pmpro-constantcontact', 'apikey-fail', $message, 'error' );
+			add_settings_error( 'pmpro-constantcontact', 'apikey-fail', $msg, 'error' );
 		}
 	}
-	
+	else
+		$all_lists = array();
 	update_option( "pmprocc_all_lists", $all_lists);
-	
-	
-
 ?>
 <div class="wrap">
 	<div id="icon-options-general" class="icon32"><br></div>
@@ -795,3 +794,30 @@ function pluck($key, $data) {
         return $result;
     }, array());
 }
+
+/*
+Function to add links to the plugin action links
+*/
+function pmprocc_add_action_links($links) {	
+	$new_links = array(
+			'<a href="' . get_admin_url(NULL, 'options-general.php?page=pmprocc_options') . '">Settings</a>',
+	);
+	return array_merge($new_links, $links);
+}
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'pmprocc_add_action_links');
+
+/*
+Function to add links to the plugin row meta
+*/
+function pmprocc_plugin_row_meta($links, $file) {
+	if(strpos($file, 'pmpro-constant-contact.php') !== false)
+	{
+		$new_links = array(
+			'<a href="' . esc_url('http://www.paidmembershipspro.com/add-ons/third-party-integration/pmpro-constant-contact/') . '" title="' . esc_attr( __( 'View Documentation', 'pmpro' ) ) . '">' . __( 'Docs', 'pmpro' ) . '</a>',
+			'<a href="' . esc_url('http://paidmembershipspro.com/support/') . '" title="' . esc_attr( __( 'Visit Customer Support Forum', 'pmpro' ) ) . '">' . __( 'Support', 'pmpro' ) . '</a>',
+		);
+		$links = array_merge($links, $new_links);
+	}
+	return $links;
+}
+add_filter('plugin_row_meta', 'pmprocc_plugin_row_meta', 10, 2);
