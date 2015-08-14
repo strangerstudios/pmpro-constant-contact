@@ -210,11 +210,11 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			switch($options['unsubscribe']) {
 				case UNSUB_YES:
 					//error_log("getting ALL ids to remove");
-					$list_ids_to_remove = pluck('id', $all_lists);
+					$list_ids_to_remove = pmprocc_pluck('id', $all_lists);
 					break;
 				case UNSUB_MANAGED:
 					//error_log("getting MANAGED ids to remove");
-					$list_ids_to_remove = flatten(getSubarrayExcept($options, 'level_' . $level_id . '_lists', '^level_\\d+_lists$'));
+					$list_ids_to_remove = pmprocc_flatten(pmprocc_getSubarrayExcept($options, 'level_' . $level_id . '_lists', '^level_\\d+_lists$'));
 					break;
 				default:
 					throw new Exception("unhandled unsubscribe option " . $options['unsubscribe']);
@@ -225,7 +225,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			{
 				if(!in_array($id, $options['level_' . $level_id . '_lists']))
 				{
-					deleteFromList($options['access_token'], $list_user->user_email, $id);
+					pmprocc_deleteFromList($options['access_token'], $list_user->user_email, $id);
 				}
 			}
 		}
@@ -287,10 +287,10 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			{
 				switch($options['unsubscribe']) {
 					case UNSUB_YES:
-						$list_ids_to_remove = pluck('id', $all_lists);
+						$list_ids_to_remove = pmprocc_pluck('id', $all_lists);
 						break;
 					case UNSUB_MANAGED:
-						$list_ids_to_remove = flatten(getSubarrayExcept($options, '', '^level_\\d+_lists$'));
+						$list_ids_to_remove = pmprocc_flatten(pmprocc_getSubarrayExcept($options, '', '^level_\\d+_lists$'));
 						break;
 					default:
 						throw new Exception("unhandled unsubscribe option " . $options['unsubscribe']);
@@ -300,7 +300,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 				{
 					if(!in_array($id, $options['users_lists']))
 					{
-						deleteFromList($options['access_token'], $list_user->user_email, $id);
+						pmprocc_deleteFromList($options['access_token'], $list_user->user_email, $id);
 					}
 				}
 			}
@@ -313,10 +313,10 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			{
 				switch($options['unsubscribe']) {
 					case UNSUB_YES:
-						$list_ids_to_remove = pluck('id', $all_lists);
+						$list_ids_to_remove = pmprocc_pluck('id', $all_lists);
 						break;
 					case UNSUB_MANAGED:
-						$list_ids_to_remove = flatten(getSubarrayExcept($options, '', '^level_\\d+_lists$'));
+						$list_ids_to_remove = pmprocc_flatten(pmprocc_getSubarrayExcept($options, '', '^level_\\d+_lists$'));
 						break;
 					default:
 						throw new Exception("unhandled unsubscribe option " . $options['unsubscribe']);
@@ -324,7 +324,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 				
 				foreach($list_ids_to_remove as $id)
 				{
-					deleteFromList($options['access_token'], $list_user->user_email, $id);
+					pmprocc_deleteFromList($options['access_token'], $list_user->user_email, $id);
 				}
 			}
 		}
@@ -592,8 +592,6 @@ function pmprocc_options_page()
 {
 	//get options
 	$options = get_option("pmprocc_options", array('api_key'=>'', 'access_token'=>'', 'unsubscribe'=>''));
-	
-	$api = new ConstantContact($options['api_key']);
 
 	global $pmprocc_lists;
 			
@@ -610,11 +608,15 @@ function pmprocc_options_page()
 	}	
 	
 	//check for a valid API key and get lists
-	$api_key = $options['api_key'];
-	$access_token = $options['access_token'];
-	
+	if(!empty($options['api_key']))
+		$api_key = $options['api_key'];
+	if(!empty($options['access_token']))
+		$access_token = $options['access_token'];
+
 	if(!empty($api_key) && !empty($access_token))
 	{
+		$api = new ConstantContact($options['api_key']);
+
 		try 
 		{
     			$lists = $api->getLists($options['access_token']);
@@ -713,7 +715,7 @@ function pmprocc_activation()
 register_activation_hook(__FILE__, "pmprocc_activation");
 
 
-function isMemberOfList(Contact $contact, $list_id)
+function pmprocc_isMemberOfList(Contact $contact, $list_id)
 {
 	//error_log("PMPCC: contact's lists = " . print_r($contact->lists, true));
 	foreach($contact->lists as $key => $value)
@@ -725,7 +727,7 @@ function isMemberOfList(Contact $contact, $list_id)
 	return false;
 }
 
-function deleteFromList($access_token, $email, $list_id)
+function pmprocc_deleteFromList($access_token, $email, $list_id)
 {
 	
 	try
@@ -743,7 +745,7 @@ function deleteFromList($access_token, $email, $list_id)
 		{
 			$contact = $response->results[0];
 
-			if(isMemberofList($contact, $list_id)) {
+			if(pmprocc_isMemberofList($contact, $list_id)) {
 				$api->deleteContactFromList($access_token,$contact, $list_id);
 			}
 			else {
@@ -763,7 +765,7 @@ function deleteFromList($access_token, $email, $list_id)
 
 }
 
-function getSubarrayExcept($input, $except_key, $search_regex = "")
+function pmprocc_getSubarrayExcept($input, $except_key, $search_regex = "")
 {
 	//error_log("PMPCC: GETSUBARRAYEXCEPT " . print_r($input, true) . ", except $except_key, search_regex $search_regex");
 	$tmpkeys = array();
@@ -783,12 +785,12 @@ function getSubarrayExcept($input, $except_key, $search_regex = "")
 
 	return $returnVal;
 }
-function flatten(array $input) 
+function pmprocc_flatten(array $input) 
 { 
 	$output = iterator_to_array(new RecursiveIteratorIterator(new RecursiveArrayIterator($input)), FALSE);
 	return $output;
 }
-function pluck($key, $data) {
+function pmprocc_pluck($key, $data) {
     return array_reduce($data, function($result, $array) use($key) {
         isset($array[$key]) && $result[] = $array[$key];
         return $result;
