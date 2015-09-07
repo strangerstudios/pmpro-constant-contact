@@ -2,7 +2,7 @@
 Contributors: strangerstudios
 Tags: pmpro, paid memberships pro, constant contact, email marketing
 Requires at least: 3.4
-Tested up to: 4.1.1
+Tested up to: 4.3
 Stable tag: 1.0.2
 
 Sync your WordPress users and members with Constant Contact lists.
