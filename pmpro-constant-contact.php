@@ -3,7 +3,7 @@
 Plugin Name: Paid Memberships Pro - Constant Contact Add On
 Plugin URI: http://www.paidmembershipspro.com/pmpro-constantcontact/
 Description: Sync your WordPress users and members with Constant Contact lists.
-Version: 1.0.2
+Version: 1.0.3
 Author: Stranger Studios
 Author URI: http://www.strangerstudios.com
 */
@@ -675,7 +675,7 @@ function pmprocc_options_page()
 		
 		<p>This plugin will integrate your site with Constant Contact. You can choose one or more Constant Contact lists to have users subscribed to when they signup for your site.</p>
 		<p>If you have <a href="http://www.paidmembershipspro.com">Paid Memberships Pro</a> installed, you can also choose one or more Constant Contact lists to have members subscribed to for each membership level.</p>
-		<p>Don't have a Constant Contact account? <a href="http://www.constantcontact.com/features/signup.jsp?pn=strangerstudios" target="_blank">Get one here</a>. It's free.</p>
+		<p>Don't have a Constant Contact account? <a href="http://www.constantcontact.com/index.jsp?pn=paidmembershipspro" target="_blank">Get one here</a>. It's free.</p>
 		
 		<?php settings_fields('pmprocc_options'); ?>
 		<?php do_settings_sections('pmprocc_options'); ?>
@@ -815,7 +815,8 @@ function pmprocc_plugin_row_meta($links, $file) {
 	if(strpos($file, 'pmpro-constant-contact.php') !== false)
 	{
 		$new_links = array(
-			'<a href="' . esc_url('http://www.paidmembershipspro.com/add-ons/third-party-integration/pmpro-constant-contact/') . '" title="' . esc_attr( __( 'View Documentation', 'pmpro' ) ) . '">' . __( 'Docs', 'pmpro' ) . '</a>',
+			'<a href="' . esc_url('http://www.paidmembershipspro.com/add-ons/free-add-ons/pmpro-constant-contact/') . '" title="' . esc_attr( __( 'View Documentation', 'pmpro' ) ) . '">' . __( 'Docs', 'pmpro' ) . '</a>',
+			'<a href="' . esc_url('http://www.constantcontact.com/index.jsp?pn=paidmembershipspro') . '" title="' . esc_attr( __( 'Constant Contact Signup', 'pmpro' ) ) . '">' . __( 'Constant Contact Signup', 'pmpro' ) . '</a>',
 			'<a href="' . esc_url('http://paidmembershipspro.com/support/') . '" title="' . esc_attr( __( 'Visit Customer Support Forum', 'pmpro' ) ) . '">' . __( 'Support', 'pmpro' ) . '</a>',
 		);
 		$links = array_merge($links, $new_links);

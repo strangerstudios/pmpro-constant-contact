@@ -3,7 +3,7 @@ Contributors: strangerstudios
 Tags: pmpro, paid memberships pro, constant contact, email marketing
 Requires at least: 3.4
 Tested up to: 4.3
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 
 Sync your WordPress users and members with Constant Contact lists.
 
@@ -11,10 +11,11 @@ If Paid Memberships Pro is installed you can sync users by membership level, oth
 
 == Description ==
 
-Sync your WordPress users and members with Constant Contact lists.
+Sync your WordPress users and members with Constant Contact lists. Don't have a Constant Contact account? Get one here: http://www.constantcontact.com/index.jsp?pn=paidmembershipspro.
+
+For new signups in the US, a Constant Contact coach will call you following signup to get you started using Constant Contact. For the first 30 days you'll have access to a new client support number. You'll also receive ongoing support to help you with your Constant Contact account.
 
 If Paid Memberships Pro is installed you can sync users by membership level, otherwise all users can be synced to one or more lists.
-
 
 == Installation ==
 
@@ -38,6 +39,9 @@ Please visit our premium support site at http://www.paidmembershipspro.com for m
 2. Membership-level specific list subscription settings.
 
 == Changelog ==
+= 1.0.3 =
+* Updating Constant Contact Signup Link and new signups offer.
+
 = 1.0.2 =
 * Overhaul by Michael Roufa.
 * Added options to only unsub from PMPro-related lists. (Thanks, Michael Roufa)
