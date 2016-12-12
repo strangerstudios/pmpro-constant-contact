@@ -2,7 +2,6 @@
 namespace Ctct\Components\Contacts;
 
 use Ctct\Components\Component;
-use Ctct\Util\Config;
 
 /**
  * Represents a single Contact in Constant Contact
@@ -33,12 +32,6 @@ class Contact extends Component
     public $first_name;
 
     /**
-     * Middle name of the contact
-     * @var string
-     */
-    public $middle_name;
-
-    /**
      * Last name of the contact
      * @var string
      */
@@ -58,7 +51,7 @@ class Contact extends Component
 
     /**
      * Array of email addresses associated with this contact
-     * @var array
+     * @var EmailAddress[]
      */
     public $email_addresses = array();
 
@@ -76,13 +69,13 @@ class Contact extends Component
 
     /**
      * Array of addresses associated with this contact
-     * @var array
+     * @var Address[]
      */
     public $addresses = array();
 
     /**
      * Array of notes associated with this contact
-     * @var array
+     * @var Note[]
      */
     public $notes = array();
 
@@ -118,15 +111,27 @@ class Contact extends Component
 
     /**
      * Array of custom fields associated with this contact
-     * @var array
+     * @var CustomField[]
      */
     public $custom_fields = array();
 
     /**
      * Array of contact lists this contact belongs to
-     * @var array
+     * @var ContactList[]
      */
     public $lists = array();
+
+    /**
+     * Date the contact was created
+     * @var string
+     */
+    public $created_date;
+
+    /**
+     * Date the contact was last modified
+     * @var string
+     */
+    public $modified_date;
 
     /**
      * Contact source details
@@ -145,7 +150,6 @@ class Contact extends Component
         $contact->id = parent::getValue($props, "id");
         $contact->status = parent::getValue($props, "status");
         $contact->first_name = parent::getValue($props, "first_name");
-        $contact->middle_name = parent::getValue($props, "middle_name");
         $contact->last_name = parent::getValue($props, "last_name");
         $contact->confirmed = parent::getValue($props, "confirmed");
         $contact->source = parent::getValue($props, "source");
@@ -170,7 +174,7 @@ class Contact extends Component
                 $contact->notes[] = Note::create($note);
             }
         }
-      
+
         $contact->company_name = parent::getValue($props, "company_name");
         $contact->home_phone = parent::getValue($props, "home_phone");
         $contact->work_phone = parent::getValue($props, "work_phone");
@@ -188,6 +192,9 @@ class Contact extends Component
               $contact->lists[] = ContactList::create($contact_list);
           }
         }
+
+        $contact->created_date = parent::getValue($props, "created_date");
+        $contact->modified_date = parent::getValue($props, "modified_date");
 
         $contact->source_details = parent::getValue($props, "source_details");
 
