@@ -2,7 +2,6 @@
 namespace Ctct\Components\Activities;
 
 use Ctct\Components\Component;
-use Ctct\Components\Activities\ActivityError;
 
 /**
  * Represents a single Activity in Constant Contact
@@ -28,7 +27,7 @@ class Activity extends Component
     /**
      * Factory method to create an Activity object from an array
      * @param array $props - associative array of initial properties to set
-     * @return Campaign
+     * @return Activity
      */
     public static function create(array $props)
     {
@@ -42,7 +41,7 @@ class Activity extends Component
         $activity->error_count = parent::getValue($props, "error_count");
         $activity->contact_count = parent::getValue($props, "contact_count");
 
-        // set any errors that exist, otherewise destroy the property
+        // set any errors that exist, otherwise destroy the property
         if (array_key_exists('errors', $props)) {
             foreach ($props['errors'] as $error) {
                 $activity->errors[] = ActivityError::create($error);
@@ -51,7 +50,7 @@ class Activity extends Component
             unset($activity->errors);
         }
 
-        // set any warnings that exist, otherewise destroy the property
+        // set any warnings that exist, otherwise destroy the property
         if (array_key_exists('warnings', $props)) {
             foreach ($props['warnings'] as $error) {
                 $activity->warnings[] = ActivityError::create($error);
