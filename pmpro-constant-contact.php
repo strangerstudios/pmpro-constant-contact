@@ -29,7 +29,7 @@ function pmprocc_init()
 {
 	//error_log("PMPROCC_INIT");
 	// Include ConstantContact Class if we don't have it already.
-	if (!class_exists('Ctct\\ConstantContact')) {
+	if (!class_exists('Ctct\\ConstantContact') && !class_exists('Ctct\\SplClassLoader')) {
 		require_once dirname(__FILE__) . '/includes/Ctct/autoload.php';
 	}
 
@@ -95,7 +95,7 @@ function pmprocc_user_register($user_id)
 		try
 		{
 			// check to see if a contact with the email addess already exists in the account
-			$response = $api->getContactByEmail($options['access_token'], $list_user->user_email);
+			$response = $api->contactService->getContacts($options['access_token'], array('email' => $list_user->user_email));
 			$is_new_contact = empty($response->results);
 			// create a new contact if one does not exist
 			if ($is_new_contact)
@@ -114,10 +114,10 @@ function pmprocc_user_register($user_id)
 				$contact->addList($list->id);
 			}
 			if ($is_new_contact) {
-				$api->addContact($options['access_token'], $contact); 
+                                $api->contactService->addContact($options['access_token'], $contact);
 			}
 			else {
-				$api->updateContact($options['access_token'], $contact);
+                                $api->contactService->updateContact($options['access_token'], $contact);
 			}
 		}
 		
@@ -170,7 +170,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 			try
 			{
 				// Check to see if a contact with the email addess already exists in the account
-				$response = $api->getContactByEmail($options['access_token'], $list_user->user_email);
+			        $response = $api->contactService->getContacts($options['access_token'], array('email' => $list_user->user_email));
 				
 				// Create a new contact if one does not exist
 				if (empty($response->results))
@@ -180,7 +180,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 					$contact->addList($list);
 					$contact->first_name = $list_user->first_name;
 					$contact->last_name = $list_user->last_name;
-					$api->addContact($options['access_token'], $contact); 
+                                        $api->contactService->addContact($options['access_token'], $contact);
 				}      			
 				else
 				{
@@ -189,7 +189,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 					$contact->addList($list);
 					$contact->first_name = $list_user->first_name;
 					$contact->last_name = $list_user->last_name;
-					$returnContact = $api->updateContact($options['access_token'], $contact, false);
+                                        $returnContact = $api->contactService->updateContact($options['access_token'], $contact);
 				}
       			
         
@@ -246,7 +246,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 				try
 				{
 					// check to see if a contact with the email addess already exists in the account
-					$response = $api->getContactByEmail($options['access_token'], $list_user->user_email);
+			                $response = $api->contactService->getContacts($options['access_token'], array('email' => $list_user->user_email));
 
 					// create a new contact if one does not exist
 					if (empty($response->results))
@@ -271,7 +271,7 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 							}
 						}		
 						
-						$api->addContact($options['access_token'], $contact, true); 
+                                                $api->contactService->addContact($options['access_token'], $contact, array('action_by' => 'ACTION_BY_VISITOR')); 
 					}	
 				}			
 				//Catch any errors so the user can't see them.
@@ -343,7 +343,7 @@ function pmprocc_profile_update($user_id, $old_user_data)
 		
 		//$lists = $api->getLists($options['access_token']);
 		
-		$response = $api->getContactByEmail($options['access_token'], $old_user_data->user_email);
+                $response = $api->contactService->getContacts($options['access_token'], array('email' => $old_user_data->user_email));
 		$contact = $response->results[0];
 				
 		if(!empty($contact))
@@ -351,7 +351,7 @@ function pmprocc_profile_update($user_id, $old_user_data)
 			$contact->first_name = $new_user_data->first_name;
 			$contact->last_name = $new_user_data->last_name;
 			$contact->email_addresses[0]->email_address = $new_user_data->user_email;
-			$api->updateContact($options['access_token'], $contact, true);
+                        $api->contactService->updateContact($options['access_token'], $contact, array('action_by'=> 'ACTION_BY_VISITOR'));
 		}		
 	}
 }
@@ -619,7 +619,7 @@ function pmprocc_options_page()
 
 		try 
 		{
-    			$lists = $api->getLists($options['access_token']);
+                        $lists = $api->listService->getLists($options['access_token'], array());
 		} 
 		
 		catch (CtctException $ex) 
@@ -739,14 +739,14 @@ function pmprocc_deleteFromList($access_token, $email, $list_id)
 		
 		$api = new ConstantContact($options['api_key']);
 
-		$response = $api->getContactByEmail($access_token, $email);
+		$response = $api->contactService->getContacts($access_token, array('email' => $email));
 
 		if(!empty($response->results))
 		{
 			$contact = $response->results[0];
 
 			if(pmprocc_isMemberofList($contact, $list_id)) {
-				$api->deleteContactFromList($access_token,$contact, $list_id);
+                                $api->contactService->deleteContactFromList($access_token, $contact, $list_id);
 			}
 			else {
 				//error_log("PMPCC: Email $email is not a member of list $list_id");
@@ -816,7 +816,7 @@ function pmprocc_plugin_row_meta($links, $file) {
 	{
 		$new_links = array(
 			'<a href="' . esc_url('http://www.paidmembershipspro.com/add-ons/free-add-ons/pmpro-constant-contact/') . '" title="' . esc_attr( __( 'View Documentation', 'pmpro' ) ) . '">' . __( 'Docs', 'pmpro' ) . '</a>',
-			'<a href="' . esc_url('http://www.constantcontact.com/index.jsp?pn=paidmembershipspro') . '" title="' . esc_attr( __( 'Constant Contact Signup', 'pmpro' ) ) . '">' . __( 'Constant Contact Signup', 'pmpro' ) . '</a>',
+                        '<a href="' . esc_url('http://www.constantcontact.com/index.jsp?pn=paidmembershipspro') . '" title="' . esc_attr( __( 'Constant Contact Signup', 'pmpro' ) ) . '">' . __( 'Constant Contact Signup', 'pmpro' ) . '</a>',
 			'<a href="' . esc_url('http://paidmembershipspro.com/support/') . '" title="' . esc_attr( __( 'Visit Customer Support Forum', 'pmpro' ) ) . '">' . __( 'Support', 'pmpro' ) . '</a>',
 		);
 		$links = array_merge($links, $new_links);
