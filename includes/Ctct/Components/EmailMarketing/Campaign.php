@@ -3,9 +3,7 @@ namespace Ctct\Components\EmailMarketing;
 
 use Ctct\Components\Component;
 use Ctct\Util\Config;
-use Ctct\Components\EmailMarketing\MessageFooter;
 use Ctct\Components\Tracking\TrackingSummary;
-use Ctct\Components\EmailMarketing\ClickThroughDetails;
 use Ctct\Components\Contacts\ContactList;
 use Ctct\Exceptions\IllegalArgumentException;
 
@@ -116,7 +114,7 @@ class Campaign extends Component
     public $view_as_web_page_text;
 
     /**
-     * Text that will be dispalyed as the link if is_view_as_webpage_enabled is true
+     * Text that will be displayed as the link if is_view_as_webpage_enabled is true
      * @var string
      */
     public $view_as_web_page_link_text;
@@ -278,6 +276,7 @@ class Campaign extends Component
     /**
      * Add a contact list to set of lists associated with this email
      * @param mixed $contact_list - Contact list id, or ContactList object
+     * @throws IllegalArgumentException
      */
     public function addList($contact_list)
     {
