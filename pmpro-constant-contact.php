@@ -149,16 +149,15 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 		return;
 	}
 	
+	//get user info
+	$list_user = get_userdata($user_id);
 	
 	//should we add them to any lists?
 	if(!empty($options['level_' . $level_id . '_lists']))
 	{
 		//error_log("AFTER_CHANGE_MEMBERSHIP: subscribing to CC ID = " . print_r($options['level_' . $level_id . '_lists'], true));
 		
-		
-		//get user info
-		$list_user = get_userdata($user_id);		
-		
+  
 		//subscribe to each list
 		$api = new ConstantContact($options['api_key']);
 				
@@ -236,7 +235,6 @@ function pmprocc_pmpro_after_change_membership_level($level_id, $user_id)
 		if(!empty($options['users_lists']))
 		{
 			//get user info
-			$list_user = get_userdata($user_id);
 			
 			//subscribe to each list
 			$api = new ConstantContact($options['api_key']);
