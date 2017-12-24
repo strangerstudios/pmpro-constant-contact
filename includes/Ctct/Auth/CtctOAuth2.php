@@ -1,9 +1,11 @@
 <?php
 namespace Ctct\Auth;
 
-use Ctct\Util\Config;
-use Ctct\Util\RestClient;
+use Ctct\Exceptions\CtctException;
 use Ctct\Exceptions\OAuth2Exception;
+use Ctct\Util\Config;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 
 /**
  * Class that implements necessary functionality to obtain an access token from a user
@@ -16,14 +18,15 @@ class CtctOAuth2
     public $clientId;
     public $clientSecret;
     public $redirectUri;
+    public $client;
     public $props;
 
-    public function __construct($clientId, $clientSecret, $redirectUri, $restClient = null)
+    public function __construct($clientId, $clientSecret, $redirectUri)
     {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
         $this->redirectUri = $redirectUri;
-        $this->restClient = ($restClient) ? $restClient : new RestClient();
+        $this->client = new Client();
     }
 
     /**
@@ -46,15 +49,17 @@ class CtctOAuth2
             $params['state'] = $state;
         }
 
-        $url = Config::get('auth.base_url') . Config::get('auth.authorization_endpoint');
-        return $url . '?' . http_build_query($params);
+        $baseUrl = Config::get('auth.base_url') . Config::get('auth.authorization_endpoint');
+        $request = $this->client->createRequest("GET", $baseUrl);
+        $request->setQuery($params);
+        return $request->getUrl();
     }
 
     /**
      * Obtain an access token
      * @param string $code - code returned from Constant Contact after a user has granted access to their account
      * @return array
-     * @throws \Ctct\Exceptions\OAuth2Exception
+     * @throws OAuth2Exception
      */
     public function getAccessToken($code)
     {
@@ -66,29 +71,47 @@ class CtctOAuth2
             'redirect_uri' => $this->redirectUri
         );
 
-        $url = Config::get('auth.base_url') . Config::get('auth.token_endpoint') . '?' . http_build_query($params);
+        $baseUrl = Config::get('auth.base_url') . Config::get('auth.token_endpoint');
+        $request = $this->client->createRequest("POST", $baseUrl);
+        $request->setQuery($params);
 
-        $response = $this->restClient->post($url);
-        $resposeBody = json_decode($response->body, true);
-
-        if (array_key_exists('error', $resposeBody)) {
-            throw new OAuth2Exception($resposeBody['error'] . ': ' . $resposeBody['error_description']);
+        try {
+            $response = $this->client->send($request)->json();
+        } catch (ClientException $e) {
+            throw $this->convertException($e);
         }
 
-        return $resposeBody;
+        return $response;
     }
 
     /**
      * Get an information about an access token
      * @param string $accessToken - Constant Contact OAuth2 access token
      * @return array
-     * @throws \Ctct\Exceptions\CtctException
+     * @throws CtctException
      */
     public function getTokenInfo($accessToken)
     {
-        $restClient = new RestClient();
-        $url = Config::get('auth.base_url') . Config::get('auth.token_info');
-        $response = $this->restClient->post($url, array(), "access_token=" . $accessToken);
-        return json_decode($response->body, true);
+        $baseUrl = Config::get('auth.base_url') . Config::get('auth.token_info');
+        $request = $this->client->createRequest("POST", $baseUrl);
+        $request->setQuery(array("access_token" => $accessToken));
+
+        try {
+            $response = $this->client->send($request)->json();
+        } catch (ClientException $e) {
+            throw $this->convertException($e);
+        }
+        return $response;
+    }
+
+    /**
+     * @param ClientException $exception
+     * @return OAuth2Exception
+     */
+    private function convertException($exception) {
+        $oauth2Exception = new OAuth2Exception($exception->getResponse()->getReasonPhrase(), $exception->getCode());
+        $oauth2Exception->setUrl($exception->getResponse()->getEffectiveUrl());
+        $oauth2Exception->setErrors(array(json_decode($exception->getResponse()->getBody()->getContents())));
+        return $oauth2Exception;
     }
 }

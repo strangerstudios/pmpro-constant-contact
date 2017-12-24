@@ -1,5 +1,4 @@
 <?php
-
 namespace Ctct\Components\Tracking;
 
 use Ctct\Components\Component;
@@ -22,7 +21,7 @@ class ForwardActivity extends Component
     /**
      * Factory method to create a ForwardActivity object from an array
      * @param array $props - array of properties to create object from
-     * @return ClickActivity
+     * @return ForwardActivity
      */
     public static function create(array $props)
     {
