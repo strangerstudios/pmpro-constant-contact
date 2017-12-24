@@ -111,7 +111,7 @@ function pmprocc_user_register($user_id)
 			// Add each of our default users_lists to 
 			foreach($options['users_lists'] as $list)
 			{					
-				$contact->addList($list->id);
+				$contact->addList($list);
 			}
 			if ($is_new_contact) {
                                 $api->contactService->addContact($options['access_token'], $contact);
@@ -746,7 +746,12 @@ function pmprocc_deleteFromList($access_token, $email, $list_id)
 			$contact = $response->results[0];
 
 			if(pmprocc_isMemberofList($contact, $list_id)) {
-                                $api->contactService->deleteContactFromList($access_token, $contact, $list_id);
+			    foreach ($contact->lists as $key => $value) {
+                    		if ($value->id == $list_id) { 
+                    		    unset($contact->lists[$key]);
+                   		 }
+               		    }
+                	    $api->contactService->updateContact($access_token, $contact);
 			}
 			else {
 				//error_log("PMPCC: Email $email is not a member of list $list_id");
