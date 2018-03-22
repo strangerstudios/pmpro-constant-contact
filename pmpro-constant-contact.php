@@ -1,11 +1,11 @@
 <?php
 /*
 Plugin Name: Paid Memberships Pro - Constant Contact Add On
-Plugin URI: http://www.paidmembershipspro.com/pmpro-constantcontact/
+Plugin URI: https://www.paidmembershipspro.com/add-ons/pmpro-constant-contact/
 Description: Sync your WordPress users and members with Constant Contact lists.
 Version: 1.0.3
-Author: Stranger Studios
-Author URI: http://www.strangerstudios.com
+Author: Paid Memberships Pro
+Author URI: https://www.paidmembershipspro.com
 */
 /*
 	Copyright 2011	Stranger Studios	(email : jason@strangerstudios.com)
@@ -815,9 +815,9 @@ function pmprocc_plugin_row_meta($links, $file) {
 	if(strpos($file, 'pmpro-constant-contact.php') !== false)
 	{
 		$new_links = array(
-			'<a href="' . esc_url('http://www.paidmembershipspro.com/add-ons/free-add-ons/pmpro-constant-contact/') . '" title="' . esc_attr( __( 'View Documentation', 'pmpro' ) ) . '">' . __( 'Docs', 'pmpro' ) . '</a>',
+			'<a href="' . esc_url('https://www.paidmembershipspro.com/add-ons/pmpro-constant-contact/') . '" title="' . esc_attr( __( 'View Documentation', 'pmpro' ) ) . '">' . __( 'Docs', 'pmpro' ) . '</a>',
 			'<a href="' . esc_url('http://www.constantcontact.com/index.jsp?pn=paidmembershipspro') . '" title="' . esc_attr( __( 'Constant Contact Signup', 'pmpro' ) ) . '">' . __( 'Constant Contact Signup', 'pmpro' ) . '</a>',
-			'<a href="' . esc_url('http://paidmembershipspro.com/support/') . '" title="' . esc_attr( __( 'Visit Customer Support Forum', 'pmpro' ) ) . '">' . __( 'Support', 'pmpro' ) . '</a>',
+			'<a href="' . esc_url('https://www.paidmembershipspro.com/support/') . '" title="' . esc_attr( __( 'Visit Customer Support Forum', 'pmpro' ) ) . '">' . __( 'Support', 'pmpro' ) . '</a>',
 		);
 		$links = array_merge($links, $new_links);
 	}
