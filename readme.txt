@@ -40,7 +40,7 @@ This plugin works with and without Paid Memberships Pro installed.
 
 After entering these values, save the settings. You will know that your site is connected to your Constant Contact account when the lists appear on the settings page. Continue with the setup by assigning User or Member Lists and reviewing the additional settings.
 
-For full documentation on all settings, please visit the [Constant Contact Integration Add On documentation page at Paid Memberships Pro](https://www.paidmembershipspro.com/add-ons/pmpro-mailchimp-integration/). 
+For full documentation on all settings, please visit the [Constant Contact Integration Add On documentation page at Paid Memberships Pro](https://www.paidmembershipspro.com/add-ons/pmpro-constant-contact/). 
 
 == Frequently Asked Questions ==
 
