@@ -9,6 +9,8 @@ Add users and members to Constant Contact lists based on their membership level.
 
 == Description ==
 
+Note: This plugin was developed to support an older version of the third-party API and will not work with the latest version of Constant Contact. We are keeping it here for archive reasons and in case future development occurs. If you would like to add a vote to have this worked on, please use our [contact form](https://www.paidmembershipspro.com/contact/). As an alternative, you can consider using the [Zapier Integration](https://www.paidmembershipspro.com/add-ons/pmpro-zapier/).
+
 Subscribe WordPress users and members to your Constant Contact lists.
 
 This plugin offers extended functionality for [membership websites using the Paid Memberships Pro plugin](https://wordpress.org/plugins/paid-memberships-pro/) available for free in the WordPress plugin repository. 
