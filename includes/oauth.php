@@ -34,7 +34,7 @@ function pmprocc_handle_oauth_callback() {
 
 	// Handle OAuth error response.
 	if ( ! empty( $_GET['error'] ) ) {
-		pmprocc_log( 'OAuth error: ' . sanitize_text_field( $_GET['error'] ) );
+		pmprocc_log( 'OAuth error: ' . sanitize_text_field( wp_unslash( $_GET['error'] ) ) );
 		wp_safe_redirect( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_error=oauth_denied' ) );
 		exit;
 	}
@@ -44,8 +44,8 @@ function pmprocc_handle_oauth_callback() {
 		return;
 	}
 
-	$code  = sanitize_text_field( $_GET['code'] );
-	$state = sanitize_text_field( $_GET['state'] );
+	$code  = sanitize_text_field( wp_unslash( $_GET['code'] ) );
+	$state = sanitize_text_field( wp_unslash( $_GET['state'] ) );
 
 	// Validate state parameter.
 	$stored_state = get_transient( 'pmprocc_oauth_state' );

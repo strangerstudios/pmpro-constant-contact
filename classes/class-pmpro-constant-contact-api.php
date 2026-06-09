@@ -227,8 +227,11 @@ class PMPro_Constant_Contact_API {
 
 		if ( empty( $body['access_token'] ) ) {
 			pmprocc_log( 'Token refresh failed: ' . wp_remote_retrieve_body( $response ) );
-			// If refresh fails, disconnect.
-			$this->disconnect();
+			// Only disconnect if the refresh token itself was rejected.
+			// Keep tokens on transient failures (network issues, 5xx) so we can retry later.
+			if ( ! empty( $body['error'] ) && 'invalid_grant' === $body['error'] ) {
+				$this->disconnect();
+			}
 			return false;
 		}
 
@@ -244,12 +247,22 @@ class PMPro_Constant_Contact_API {
 	 * @param array $token_data Response from token endpoint.
 	 */
 	private function store_tokens( $token_data ) {
+		$existing = get_option( 'pmprocc_tokens', array() );
+
+		// Constant Contact rotates refresh tokens, but if a response omits one,
+		// keep the token we already have rather than losing it.
+		if ( ! empty( $token_data['refresh_token'] ) ) {
+			$refresh_token = $token_data['refresh_token'];
+		} else {
+			$refresh_token = ! empty( $existing['refresh_token'] ) ? $existing['refresh_token'] : '';
+		}
+
 		$tokens = array(
 			'access_token'  => $token_data['access_token'],
-			'refresh_token' => ! empty( $token_data['refresh_token'] ) ? $token_data['refresh_token'] : '',
+			'refresh_token' => $refresh_token,
 			'expires_at'    => time() + ( ! empty( $token_data['expires_in'] ) ? intval( $token_data['expires_in'] ) : 86400 ),
 		);
-		update_option( 'pmprocc_tokens', $tokens );
+		update_option( 'pmprocc_tokens', $tokens, false );
 	}
 
 	/**
@@ -327,6 +340,34 @@ class PMPro_Constant_Contact_API {
 		return $data;
 	}
 
+	/**
+	 * Convert a pagination link href into a relative endpoint and query args.
+	 *
+	 * The v3 API returns _links.next.href values that include the /v3 prefix
+	 * (e.g. '/v3/contact_lists?cursor=...'), which must be stripped before
+	 * passing back into request().
+	 *
+	 * @param string $href  The _links href value.
+	 * @param array  $query Filled with the parsed query args.
+	 * @return string|null Relative endpoint, or null if it could not be parsed.
+	 */
+	private function get_endpoint_from_link( $href, &$query ) {
+		$query  = array();
+		$parsed = wp_parse_url( $href );
+
+		if ( empty( $parsed['path'] ) ) {
+			return null;
+		}
+
+		$endpoint = preg_replace( '#^/v3(?=/|$)#', '', $parsed['path'] );
+
+		if ( ! empty( $parsed['query'] ) ) {
+			wp_parse_str( $parsed['query'], $query );
+		}
+
+		return $endpoint;
+	}
+
 	// ------------------------------------------------------------------
 	// Contact Lists
 	// ------------------------------------------------------------------
@@ -373,12 +414,7 @@ class PMPro_Constant_Contact_API {
 			$endpoint = null;
 			$query    = array();
 			if ( ! empty( $result['_links']['next']['href'] ) ) {
-				$next_url = $result['_links']['next']['href'];
-				$parsed   = wp_parse_url( $next_url );
-				$endpoint = $parsed['path'];
-				if ( ! empty( $parsed['query'] ) ) {
-					wp_parse_str( $parsed['query'], $query );
-				}
+				$endpoint = $this->get_endpoint_from_link( $result['_links']['next']['href'], $query );
 			}
 		}
 
@@ -435,12 +471,7 @@ class PMPro_Constant_Contact_API {
 			$endpoint = null;
 			$query    = array();
 			if ( ! empty( $result['_links']['next']['href'] ) ) {
-				$next_url = $result['_links']['next']['href'];
-				$parsed   = wp_parse_url( $next_url );
-				$endpoint = $parsed['path'];
-				if ( ! empty( $parsed['query'] ) ) {
-					wp_parse_str( $parsed['query'], $query );
-				}
+				$endpoint = $this->get_endpoint_from_link( $result['_links']['next']['href'], $query );
 			}
 		}
 

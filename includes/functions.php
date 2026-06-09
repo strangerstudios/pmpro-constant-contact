@@ -25,16 +25,32 @@ function pmprocc_log( $message ) {
 		return;
 	}
 
-	$log_dir = defined( 'PMPRO_DIR' ) ? PMPRO_DIR . '/logs/' : PMPROCC_DIR . 'logs/';
-	if ( ! is_dir( $log_dir ) ) {
-		wp_mkdir_p( $log_dir );
+	$log_file = pmprocc_get_log_file_path();
+	if ( empty( $log_file ) ) {
+		return;
 	}
 
-	$log_file = $log_dir . 'pmpro-constant-contact.log';
-	$entry    = '[' . gmdate( 'Y-m-d H:i:s' ) . '] ' . $message . "\n";
+	$entry = '[' . gmdate( 'Y-m-d H:i:s' ) . '] ' . $message . "\n";
 
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 	file_put_contents( $log_file, $entry, FILE_APPEND | LOCK_EX );
+}
+
+/**
+ * Get the path to the debug log file.
+ *
+ * Uses PMPro's restricted files directory (uploads/pmpro-<random>/logs/),
+ * which core protects from direct web access, matching how the Stripe
+ * webhook log is stored.
+ *
+ * @return string Log file path, or empty string if unavailable.
+ */
+function pmprocc_get_log_file_path() {
+	if ( ! function_exists( 'pmpro_get_restricted_file_path' ) ) {
+		return '';
+	}
+
+	return pmpro_get_restricted_file_path( 'logs', 'pmpro-constant-contact.log' );
 }
 
 // ------------------------------------------------------------------
@@ -51,7 +67,7 @@ function pmprocc_enqueue_sync_for_user( $user_id, $update_tags = true ) {
 	$options = get_option( 'pmprocc_options', array() );
 
 	if ( ! empty( $options['background_sync'] ) && class_exists( 'PMPro_Action_Scheduler' ) ) {
-		PMPro_Action_Scheduler::get_instance()->schedule(
+		PMPro_Action_Scheduler::instance()->maybe_add_task(
 			'pmprocc_sync_contact_for_user',
 			array( $user_id, $update_tags ),
 			'pmprocc_sync_tasks'
@@ -155,12 +171,17 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	// ------------------------------------------------------------------
 	$contact_data = array(
 		'email_address'    => $user->user_email,
-		'first_name'       => $user->first_name,
-		'last_name'        => $user->last_name,
 		'create_source'    => 'Account',
-		'update_source'    => 'Account',
-		'list_memberships' => $subscribe_lists,
+		'list_memberships' => array_values( $subscribe_lists ),
 	);
+
+	// The sign_up_form endpoint rejects empty name fields.
+	if ( '' !== $user->first_name ) {
+		$contact_data['first_name'] = $user->first_name;
+	}
+	if ( '' !== $user->last_name ) {
+		$contact_data['last_name'] = $user->last_name;
+	}
 
 	if ( ! empty( $custom_fields ) ) {
 		$contact_data['custom_fields'] = $custom_fields;
@@ -175,19 +196,28 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	 */
 	$contact_data = apply_filters( 'pmprocc_contact_data', $contact_data, $user, $levels );
 
-	$result = $api->upsert_contact( $contact_data );
+	if ( ! empty( $contact_data['list_memberships'] ) ) {
+		$result = $api->upsert_contact( $contact_data );
 
-	if ( is_wp_error( $result ) ) {
-		pmprocc_log( "Failed to upsert contact for user {$user_id}: " . $result->get_error_message() );
-		return;
+		if ( is_wp_error( $result ) ) {
+			pmprocc_log( "Failed to upsert contact for user {$user_id}: " . $result->get_error_message() );
+			return;
+		}
+
+		$contact_id = ! empty( $result['contact_id'] ) ? $result['contact_id'] : '';
+		if ( $contact_id ) {
+			update_user_meta( $user_id, 'pmprocc_contact_id', $contact_id );
+		}
+
+		pmprocc_log( "Upserted contact {$contact_id} for user {$user_id}" );
+	} else {
+		// The sign_up_form endpoint requires at least one list, so we can't upsert.
+		// Look up the existing contact so the list removals and tag changes below
+		// still run (e.g. a member cancels and no non-member lists are configured).
+		$contact    = $api->get_contact_by_email( $user->user_email );
+		$contact_id = ! empty( $contact['contact_id'] ) ? $contact['contact_id'] : '';
+		pmprocc_log( "No lists apply to user {$user_id}; skipped upsert. Existing contact: " . ( $contact_id ? $contact_id : 'none' ) );
 	}
-
-	$contact_id = ! empty( $result['contact_id'] ) ? $result['contact_id'] : '';
-	if ( $contact_id ) {
-		update_user_meta( $user_id, 'pmprocc_contact_id', $contact_id );
-	}
-
-	pmprocc_log( "Upserted contact {$contact_id} for user {$user_id}" );
 
 	// ------------------------------------------------------------------
 	// Handle unsubscription from old level lists.

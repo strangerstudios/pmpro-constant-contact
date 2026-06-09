@@ -37,10 +37,21 @@ add_action( 'admin_init', 'pmprocc_admin_init' );
  * @return array Sanitized options.
  */
 function pmprocc_options_validate( $input ) {
-	$output = array();
+	// Start from the saved options so settings that weren't rendered on the
+	// form (e.g. while disconnected, only the API key field is shown) are
+	// preserved instead of being wiped.
+	$output = get_option( 'pmprocc_options', array() );
+	if ( ! is_array( $output ) ) {
+		$output = array();
+	}
 
 	// API Key (client ID).
 	$output['api_key'] = ! empty( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
+
+	// If the full settings form wasn't rendered, only update the API key.
+	if ( empty( $input['full_form'] ) ) {
+		return $output;
+	}
 
 	// Behavioral settings.
 	$output['sync_profile_update'] = ! empty( $input['sync_profile_update'] ) ? sanitize_text_field( $input['sync_profile_update'] ) : 'no';
@@ -104,6 +115,15 @@ function pmprocc_settings_page() {
 							);
 							?>
 						</p>
+						<p class="description">
+							<?php
+							printf(
+								/* translators: %s: OAuth redirect URI */
+								esc_html__( 'Set your application\'s Redirect URI to: %s', 'pmpro-constant-contact' ),
+								'<code>' . esc_html( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_oauth_callback=1' ) ) . '</code>'
+							);
+							?>
+						</p>
 					</td>
 				</tr>
 				<tr>
@@ -144,6 +164,8 @@ function pmprocc_settings_page() {
 			</table>
 
 			<?php if ( $api->is_connected() ) : ?>
+
+				<input type="hidden" name="pmprocc_options[full_form]" value="1" />
 
 				<hr />
 				<h2>
@@ -258,8 +280,8 @@ function pmprocc_settings_page() {
 								<?php esc_html_e( 'Enable debug logging for API calls and sync events.', 'pmpro-constant-contact' ); ?>
 							</label>
 							<?php
-							$log_file = ( defined( 'PMPRO_DIR' ) ? PMPRO_DIR . '/logs/' : PMPROCC_DIR . 'logs/' ) . 'pmpro-constant-contact.log';
-							if ( file_exists( $log_file ) ) :
+							$log_file = pmprocc_get_log_file_path();
+							if ( ! empty( $log_file ) && file_exists( $log_file ) ) :
 								?>
 								<p class="description">
 									<?php
@@ -326,7 +348,7 @@ function pmprocc_admin_notices() {
 	}
 
 	if ( ! empty( $_GET['pmprocc_error'] ) ) {
-		$error = sanitize_text_field( $_GET['pmprocc_error'] );
+		$error = sanitize_text_field( wp_unslash( $_GET['pmprocc_error'] ) );
 		$messages = array(
 			'oauth_denied'    => __( 'Authorization was denied. Please try again.', 'pmpro-constant-contact' ),
 			'state_mismatch'  => __( 'Security validation failed. Please try connecting again.', 'pmpro-constant-contact' ),
