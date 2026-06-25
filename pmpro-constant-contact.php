@@ -13,7 +13,7 @@
  *
  * Requires PHP: 7.4
  * Requires at least: 5.6
- * Tested up to: 6.7
+ * Tested up to: 6.9
  * Requires Plugins: paid-memberships-pro
  */
 
@@ -44,15 +44,23 @@ add_action( 'plugins_loaded', 'pmprocc_load_plugin' );
  * Set default options on activation.
  */
 function pmprocc_activation() {
-	if ( ! get_option( 'pmprocc_options' ) ) {
-		update_option( 'pmprocc_options', array(
-			'sync_profile_update' => 'yes',
-			'remove_tags'         => 1,
-			'unsubscribe'         => 'yes',
-			'background_sync'     => 1,
-			'logging_enabled'     => 0,
-		) );
+	$defaults = array(
+		'sync_profile_update' => 'yes',
+		'remove_tags'         => 1,
+		'unsubscribe'         => 'yes',
+		'background_sync'     => 1,
+		'logging_enabled'     => 0,
+	);
+
+	// Merge defaults into any existing options so upgrades from a prior version
+	// (which already stored pmprocc_options) still receive newly added keys,
+	// while preserving any settings the site has already configured.
+	$existing = get_option( 'pmprocc_options', array() );
+	if ( ! is_array( $existing ) ) {
+		$existing = array();
 	}
+
+	update_option( 'pmprocc_options', array_merge( $defaults, $existing ) );
 }
 register_activation_hook( __FILE__, 'pmprocc_activation' );
 

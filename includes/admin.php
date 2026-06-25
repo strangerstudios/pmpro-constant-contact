@@ -53,10 +53,11 @@ function pmprocc_options_validate( $input ) {
 		return $output;
 	}
 
-	// Behavioral settings.
-	$output['sync_profile_update'] = ! empty( $input['sync_profile_update'] ) ? sanitize_text_field( $input['sync_profile_update'] ) : 'no';
+	// Behavioral settings. Defaults here match the activation defaults so
+	// upgraded and fresh installs behave the same.
+	$output['sync_profile_update'] = ! empty( $input['sync_profile_update'] ) ? sanitize_text_field( $input['sync_profile_update'] ) : 'yes';
 	$output['remove_tags']         = ! empty( $input['remove_tags'] ) ? 1 : 0;
-	$output['unsubscribe']         = ! empty( $input['unsubscribe'] ) ? sanitize_text_field( $input['unsubscribe'] ) : 'no';
+	$output['unsubscribe']         = ! empty( $input['unsubscribe'] ) ? sanitize_text_field( $input['unsubscribe'] ) : 'yes';
 	$output['background_sync']     = ! empty( $input['background_sync'] ) ? 1 : 0;
 	$output['logging_enabled']     = ! empty( $input['logging_enabled'] ) ? 1 : 0;
 
@@ -83,9 +84,35 @@ function pmprocc_settings_page() {
 	$options = get_option( 'pmprocc_options', array() );
 	$api     = PMPro_Constant_Contact_API::get_instance();
 
-	$force_refresh = ! empty( $_GET['pmprocc_refresh'] );
+	// The refresh action triggers remote writes (custom-field creation), so gate
+	// it behind a nonce to prevent it firing from a forged GET link (CSRF).
+	$force_refresh = ! empty( $_GET['pmprocc_refresh'] )
+		&& isset( $_GET['_wpnonce'] )
+		&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'pmprocc_refresh' );
 	$lists         = $api->is_connected() ? $api->get_lists( $force_refresh ) : array();
 	$tags          = $api->is_connected() ? $api->get_tags( $force_refresh ) : array();
+
+	// get_lists()/get_tags() return a WP_Error on API failure so a real
+	// connection/auth problem can be surfaced instead of an empty list. Capture
+	// the messages here and fall back to an empty array for the checkbox lists.
+	$lists_error = '';
+	$tags_error  = '';
+	if ( is_wp_error( $lists ) ) {
+		$lists_error = $lists->get_error_message();
+		$lists       = array();
+	}
+	if ( is_wp_error( $tags ) ) {
+		$tags_error = $tags->get_error_message();
+		$tags       = array();
+	}
+
+	// Rebuild the custom field ID map so it doesn't go stale (e.g. when
+	// upgrading from a prior version, or if fields were changed in Constant
+	// Contact). Refreshes from the remote on the "Refresh Lists & Tags" action
+	// or whenever the map is currently empty.
+	if ( $api->is_connected() && ( $force_refresh || ! get_option( 'pmprocc_custom_field_map' ) ) ) {
+		$api->ensure_custom_fields();
+	}
 	$levels        = function_exists( 'pmpro_getAllLevels' ) ? pmpro_getAllLevels( true, true ) : array();
 	?>
 	<div class="wrap pmpro_admin pmpro-admin">
@@ -170,10 +197,21 @@ function pmprocc_settings_page() {
 				<hr />
 				<h2>
 					<?php esc_html_e( 'List & Tag Settings', 'pmpro-constant-contact' ); ?>
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_refresh=1' ) ); ?>" class="page-title-action">
+					<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_refresh=1' ), 'pmprocc_refresh' ) ); ?>" class="page-title-action">
 						<?php esc_html_e( 'Refresh Lists & Tags', 'pmpro-constant-contact' ); ?>
 					</a>
 				</h2>
+
+				<?php if ( ! empty( $lists_error ) ) : ?>
+					<div class="pmpro_message pmpro_error">
+						<p><?php echo esc_html__( 'Error fetching lists from Constant Contact.', 'pmpro-constant-contact' ) . ' ' . esc_html( $lists_error ); ?></p>
+					</div>
+				<?php endif; ?>
+				<?php if ( ! empty( $tags_error ) ) : ?>
+					<div class="pmpro_message pmpro_error">
+						<p><?php echo esc_html__( 'Error fetching tags from Constant Contact.', 'pmpro-constant-contact' ) . ' ' . esc_html( $tags_error ); ?></p>
+					</div>
+				<?php endif; ?>
 
 				<?php if ( ! empty( $levels ) ) : ?>
 
@@ -290,6 +328,14 @@ function pmprocc_settings_page() {
 										esc_html__( 'Log file size: %s', 'pmpro-constant-contact' ),
 										esc_html( size_format( filesize( $log_file ) ) )
 									);
+									$log_file_link = add_query_arg(
+										array(
+											'pmpro_restricted_file_dir' => 'logs',
+											'pmpro_restricted_file'     => 'pmpro-constant-contact.log',
+										),
+										home_url()
+									);
+									echo ' <a href="' . esc_url( $log_file_link ) . '" target="_blank">' . esc_html__( 'Download log.', 'pmpro-constant-contact' ) . '</a>';
 									?>
 								</p>
 							<?php endif; ?>

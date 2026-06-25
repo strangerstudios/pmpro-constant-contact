@@ -37,6 +37,31 @@ function pmprocc_log( $message ) {
 }
 
 /**
+ * Mask an email address for logging (PII).
+ *
+ * Turns "jane@example.com" into "j****e@example.com".
+ *
+ * @param string $email Email address.
+ * @return string Masked email.
+ */
+function pmprocc_mask_email( $email ) {
+	if ( empty( $email ) || false === strpos( $email, '@' ) ) {
+		return '';
+	}
+
+	list( $local, $domain ) = explode( '@', $email, 2 );
+
+	$len = strlen( $local );
+	if ( $len <= 2 ) {
+		$masked_local = substr( $local, 0, 1 ) . '****';
+	} else {
+		$masked_local = substr( $local, 0, 1 ) . '****' . substr( $local, -1 );
+	}
+
+	return $masked_local . '@' . $domain;
+}
+
+/**
  * Get the path to the debug log file.
  *
  * Uses PMPro's restricted files directory (uploads/pmpro-<random>/logs/),
@@ -115,7 +140,16 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	$levels    = pmpro_getMembershipLevelsForUser( $user_id );
 	$level_ids = wp_list_pluck( $levels, 'id' );
 
-	pmprocc_log( "Syncing user {$user_id} ({$user->user_email}), levels: " . implode( ',', $level_ids ) );
+	pmprocc_log( "Syncing user {$user_id} (" . pmprocc_mask_email( $user->user_email ) . '), levels: ' . implode( ',', $level_ids ) );
+
+	// Short-circuit: nothing to sync for a user with no levels, no stored
+	// contact, and no non-member lists configured. Mirrors pmpro-kit's
+	// "no levels and no subscriber ID" bail to avoid needless remote calls.
+	$stored_contact_id = get_user_meta( $user_id, 'pmprocc_contact_id', true );
+	if ( empty( $level_ids ) && empty( $stored_contact_id ) && empty( $options['users_lists'] ) ) {
+		pmprocc_log( "Nothing to sync for user {$user_id} (no levels, no stored contact, no non-member lists)." );
+		return;
+	}
 
 	// ------------------------------------------------------------------
 	// Build list membership array.
@@ -139,7 +173,14 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	// ------------------------------------------------------------------
 	// Build custom fields.
 	// ------------------------------------------------------------------
-	$field_map     = get_option( 'pmprocc_custom_field_map', array() );
+	$field_map = get_option( 'pmprocc_custom_field_map', array() );
+
+	// If the map is empty (e.g. upgraded from v1, or fields were removed in
+	// Constant Contact), rebuild it rather than silently skipping custom fields.
+	if ( empty( $field_map ) ) {
+		$field_map = $api->ensure_custom_fields();
+	}
+
 	$custom_fields = array();
 
 	if ( ! empty( $field_map['pmpro_level_id'] ) ) {
@@ -212,10 +253,15 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 		pmprocc_log( "Upserted contact {$contact_id} for user {$user_id}" );
 	} else {
 		// The sign_up_form endpoint requires at least one list, so we can't upsert.
-		// Look up the existing contact so the list removals and tag changes below
+		// Resolve the existing contact so the list removals and tag changes below
 		// still run (e.g. a member cancels and no non-member lists are configured).
-		$contact    = $api->get_contact_by_email( $user->user_email );
-		$contact_id = ! empty( $contact['contact_id'] ) ? $contact['contact_id'] : '';
+		// Prefer the stored contact ID and only fall back to a remote email lookup,
+		// matching pmpro-kit's stored-ID-first convention.
+		$contact_id = get_user_meta( $user_id, 'pmprocc_contact_id', true );
+		if ( empty( $contact_id ) ) {
+			$contact    = $api->get_contact_by_email( $user->user_email );
+			$contact_id = ! empty( $contact['contact_id'] ) ? $contact['contact_id'] : '';
+		}
 		pmprocc_log( "No lists apply to user {$user_id}; skipped upsert. Existing contact: " . ( $contact_id ? $contact_id : 'none' ) );
 	}
 
@@ -261,12 +307,38 @@ function pmprocc_sync_tags_for_contact( $user_id, $contact_id, $level_ids ) {
 	}
 	$required_tags = array_unique( array_filter( $required_tags ) );
 
+	$user = get_userdata( $user_id );
+
+	/**
+	 * Filter the set of tag IDs that should be assigned to a contact.
+	 *
+	 * Tag IDs added here are applied even if they are not part of the
+	 * level-to-tag mappings (the "controlled" set). This is intentional: a
+	 * filter that explicitly adds a tag is expected to take effect. Note,
+	 * however, that tags added this way are not in the controlled set and so
+	 * will not be removed automatically when they no longer apply.
+	 *
+	 * @param array   $required_tags Tag IDs to assign based on membership levels.
+	 * @param WP_User $user          The WordPress user.
+	 * @param array   $level_ids     Current membership level IDs.
+	 */
+	$required_tags = apply_filters( 'pmprocc_contact_tag_ids', $required_tags, $user, $level_ids );
+
 	// Get all controlled tags (any tag mapped to any level).
 	$controlled_tags = pmprocc_get_all_configured_tags();
 
-	// Get the contact's current tags.
-	$contact = $api->get_contact_by_email( get_userdata( $user_id )->user_email );
-	$current_tags = ! empty( $contact['taggings'] ) ? $contact['taggings'] : array();
+	/**
+	 * Filter the set of tag IDs that PMPro controls (and may add/remove).
+	 *
+	 * @param array $controlled_tags Tag IDs mapped to any membership level.
+	 */
+	$controlled_tags = apply_filters( 'pmprocc_controlled_tag_ids', $controlled_tags );
+
+	// Get the contact's current tags. The upsert (sign_up_form) response does not
+	// return taggings, but the contact_id is already known, so fetch the contact
+	// directly with include=taggings rather than doing a separate email lookup.
+	$contact      = $api->get_contact( $contact_id, 'taggings' );
+	$current_tags = ( ! is_wp_error( $contact ) && ! empty( $contact['taggings'] ) ) ? $contact['taggings'] : array();
 
 	// Only look at controlled tags.
 	$current_controlled = array_intersect( $current_tags, $controlled_tags );
@@ -361,10 +433,24 @@ add_action( 'pmpro_after_all_membership_level_changes', 'pmprocc_pmpro_after_all
 /**
  * Sync when a user profile is updated.
  *
- * @param int $user_id WordPress user ID.
+ * @param int          $user_id       WordPress user ID.
+ * @param WP_User|null $old_user_data The user's data before the update.
  */
-function pmprocc_profile_update( $user_id ) {
+function pmprocc_profile_update( $user_id, $old_user_data = null ) {
 	$options = get_option( 'pmprocc_options', array() );
+
+	// If the user's email changed, reconcile the existing Constant Contact
+	// contact (keyed by the OLD email) so the upsert below doesn't orphan it.
+	// This always runs, even when "Sync on Profile Update" is "No": that setting
+	// gates ongoing field/tag syncing, but an email change must still be
+	// reconciled to avoid leaving a stale contact behind (matching Mailchimp's
+	// behavior of always following email changes by stored ID).
+	if ( $old_user_data && isset( $old_user_data->user_email ) ) {
+		$new_user_data = get_userdata( $user_id );
+		if ( $new_user_data && $new_user_data->user_email !== $old_user_data->user_email ) {
+			pmprocc_handle_email_change( $user_id, $old_user_data->user_email, $new_user_data->user_email );
+		}
+	}
 
 	if ( empty( $options['sync_profile_update'] ) || 'no' === $options['sync_profile_update'] ) {
 		return;
@@ -373,17 +459,141 @@ function pmprocc_profile_update( $user_id ) {
 	$update_tags = ( 'yes' === $options['sync_profile_update'] );
 	pmprocc_enqueue_sync_for_user( $user_id, $update_tags );
 }
-add_action( 'profile_update', 'pmprocc_profile_update' );
+add_action( 'profile_update', 'pmprocc_profile_update', 10, 2 );
 
 /**
- * Sync when admin saves a member's profile via PMPro Edit Member.
+ * Update an existing Constant Contact contact's email when a WordPress user
+ * changes their email address, so we don't orphan the old contact.
+ *
+ * @param int    $user_id   WordPress user ID.
+ * @param string $old_email The user's previous email address.
+ * @param string $new_email The user's new email address.
  */
-function pmprocc_admin_member_edit() {
-	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce checked by PMPro.
-	if ( empty( $_POST['pmpro_member_edit_panel'] ) || empty( $_POST['user_id'] ) ) {
+function pmprocc_handle_email_change( $user_id, $old_email, $new_email ) {
+	$api = PMPro_Constant_Contact_API::get_instance();
+	if ( ! $api->is_connected() ) {
 		return;
 	}
-	pmprocc_enqueue_sync_for_user( intval( $_POST['user_id'] ), true );
+
+	// Find the existing contact. Prefer the stored ID, but fall back to a lookup
+	// by the old email so we can recover the contact either way. We must fetch the
+	// full resource (list_memberships, custom_fields, phone_numbers,
+	// street_addresses) because the v3 PUT below is a full replacement.
+	$include    = 'list_memberships,custom_fields,phone_numbers,street_addresses';
+	$contact_id = get_user_meta( $user_id, 'pmprocc_contact_id', true );
+	$contact    = '';
+	if ( ! empty( $contact_id ) ) {
+		$contact = $api->get_contact( $contact_id, $include );
+		if ( is_wp_error( $contact ) ) {
+			$contact = '';
+		}
+	}
+	if ( empty( $contact ) ) {
+		// Request the same full resource set as above so the full-replacement PUT
+		// below does not wipe phone_numbers / street_addresses.
+		$contact    = $api->get_contact_by_email( $old_email, $include );
+		$contact_id = ! empty( $contact['contact_id'] ) ? $contact['contact_id'] : '';
+	}
+
+	if ( empty( $contact_id ) || empty( $contact ) ) {
+		pmprocc_log( "Email change for user {$user_id}: no existing contact found for " . pmprocc_mask_email( $old_email ) . '.' );
+		return;
+	}
+
+	// The v3 Contacts API has no PATCH; a single contact is updated with a
+	// full-replacement PUT, meaning any updatable property omitted from the body
+	// is overwritten with null. We therefore rebuild the complete resource from
+	// the GET above, swap in the new email_address, set update_source, and carry
+	// over list_memberships, custom_fields, phone_numbers, and street_addresses
+	// so they are not wiped. Read-only / non-writable properties (contact_id,
+	// created_at, updated_at, taggings, and *_score / activity metadata) are
+	// stripped before sending to avoid a 400.
+	// Preserve the contact's prior opt-in state. Because the PUT fully replaces
+	// the email_address object, omitting permission_to_send would let Constant
+	// Contact reset a previously confirmed/unsubscribed contact to its default.
+	$prev_permission = isset( $contact['email_address']['permission_to_send'] ) ? $contact['email_address']['permission_to_send'] : '';
+
+	$put_data = $contact;
+	unset(
+		$put_data['contact_id'],
+		$put_data['created_at'],
+		$put_data['updated_at'],
+		$put_data['taggings'],
+		$put_data['email_address'],
+		$put_data['notes'],
+		$put_data['sms_channel'],
+		$put_data['confirmed']
+	);
+
+	$put_data['email_address'] = array( 'address' => $new_email );
+	if ( ! empty( $prev_permission ) ) {
+		$put_data['email_address']['permission_to_send'] = $prev_permission;
+	}
+	$put_data['update_source'] = 'Account';
+
+	// The v3 PUT /contacts/{id} requires list_memberships with at least one entry;
+	// an empty array returns a 400. A contact with no list memberships (e.g. it was
+	// only ever tagged, or was removed from every configured list) cannot be
+	// reconciled this way, so skip the PUT rather than silently failing on a 400.
+	if ( empty( $put_data['list_memberships'] ) ) {
+		pmprocc_log( "Email change for user {$user_id}: contact {$contact_id} has no list memberships; cannot reconcile email from " . pmprocc_mask_email( $old_email ) . ' to ' . pmprocc_mask_email( $new_email ) . ' via PUT.' );
+		return;
+	}
+
+	$result = $api->update_contact( $contact_id, $put_data );
+
+	if ( is_wp_error( $result ) ) {
+		pmprocc_log( "Failed to update email for contact {$contact_id} (user {$user_id}): " . $result->get_error_message() );
+		return;
+	}
+
+	pmprocc_log( "Updated contact {$contact_id} email from " . pmprocc_mask_email( $old_email ) . ' to ' . pmprocc_mask_email( $new_email ) . '.' );
+}
+
+/**
+ * Sync when a user-fields panel is saved on the PMPro Edit Member screen.
+ *
+ * PMPro's user fields panel saves directly to user meta without firing
+ * profile_update, so we detect the panel save and trigger the sync. Runs at
+ * priority 20 to run after PMPro's save at priority 10.
+ */
+function pmprocc_admin_member_edit() {
+	// Only act on the PMPro Edit Member page.
+	if ( empty( $_REQUEST['page'] ) || 'pmpro-member' !== $_REQUEST['page'] ) {
+		return;
+	}
+
+	// Only act on POST requests.
+	if ( empty( $_POST ) ) {
+		return;
+	}
+
+	// Only act when a user-fields panel is being saved.
+	$panel_slug = isset( $_REQUEST['pmpro_member_edit_panel'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['pmpro_member_edit_panel'] ) ) : '';
+	if ( empty( $panel_slug ) || 0 !== strpos( $panel_slug, 'user-fields-' ) ) {
+		return;
+	}
+
+	// Verify the panel nonce.
+	$nonce = isset( $_REQUEST['pmpro_member_edit_saved_panel_nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['pmpro_member_edit_saved_panel_nonce'] ) ) : '';
+	if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'pmpro_member_edit_saved_panel_' . $panel_slug ) ) {
+		return;
+	}
+
+	// Get the user ID.
+	$user_id = isset( $_REQUEST['user_id'] ) ? intval( wp_unslash( $_REQUEST['user_id'] ) ) : 0;
+	if ( empty( $user_id ) ) {
+		return;
+	}
+
+	// Respect the sync-on-profile-update setting.
+	$options             = get_option( 'pmprocc_options', array() );
+	$sync_profile_update = isset( $options['sync_profile_update'] ) ? $options['sync_profile_update'] : 'yes';
+	if ( 'no' === $sync_profile_update ) {
+		return;
+	}
+
+	pmprocc_enqueue_sync_for_user( $user_id, 'yes' === $sync_profile_update );
 }
 add_action( 'admin_init', 'pmprocc_admin_member_edit', 20 );
 
@@ -395,8 +605,11 @@ add_action( 'admin_init', 'pmprocc_admin_member_edit', 20 );
 function pmprocc_user_register( $user_id ) {
 	$options = get_option( 'pmprocc_options', array() );
 
-	// Don't sync during checkout — pmpro_after_all_membership_level_changes handles that.
-	if ( did_action( 'pmpro_checkout_before_change_membership_level' ) ) {
+	// Don't sync during checkout — at checkout the new user is created via
+	// wp_insert_user() (firing user_register) BEFORE the membership level is
+	// set, so pmpro_after_all_membership_level_changes will handle the sync.
+	// Syncing here would place the new member on the non-member lists first.
+	if ( function_exists( 'pmpro_was_checkout_form_submitted' ) && pmpro_was_checkout_form_submitted() ) {
 		return;
 	}
 

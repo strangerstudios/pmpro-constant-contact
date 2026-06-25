@@ -2,7 +2,7 @@
 Contributors: strangerstudios, flintfromthebasement
 Tags: pmpro, constant contact, email marketing, membership, sync
 Requires at least: 5.6
-Tested up to: 6.7
+Tested up to: 6.9
 Requires PHP: 7.4
 Stable tag: 2.0
 License: GPLv2 or later
@@ -50,7 +50,7 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 
 = Does this sync existing members? =
 
-The plugin syncs members when their membership level changes or when they update their profile. To sync all existing members, you can trigger a profile update or use a bulk sync tool.
+The plugin syncs members when their membership level changes or when they update their profile. To sync existing members, you can trigger a membership level or profile update for those users.
 
 = Will this remove tags I applied manually in Constant Contact? =
 

@@ -184,7 +184,9 @@ class PMPro_Constant_Contact_API {
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( empty( $body['access_token'] ) ) {
-			pmprocc_log( 'Token exchange failed: ' . wp_remote_retrieve_body( $response ) );
+			// Log only the parsed error fields, never the raw response body, which
+			// can echo back submitted parameters or token material.
+			pmprocc_log( 'Token exchange failed: ' . $this->parse_token_error( $body, $response ) );
 			return false;
 		}
 
@@ -226,7 +228,9 @@ class PMPro_Constant_Contact_API {
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( empty( $body['access_token'] ) ) {
-			pmprocc_log( 'Token refresh failed: ' . wp_remote_retrieve_body( $response ) );
+			// Log only the parsed error fields, never the raw response body, which
+			// can echo back submitted parameters or token material.
+			pmprocc_log( 'Token refresh failed: ' . $this->parse_token_error( $body, $response ) );
 			// Only disconnect if the refresh token itself was rejected.
 			// Keep tokens on transient failures (network issues, 5xx) so we can retry later.
 			if ( ! empty( $body['error'] ) && 'invalid_grant' === $body['error'] ) {
@@ -303,7 +307,7 @@ class PMPro_Constant_Contact_API {
 			'timeout' => 15,
 		);
 
-		if ( ! empty( $body ) && in_array( $method, array( 'POST', 'PUT', 'PATCH' ), true ) ) {
+		if ( ! empty( $body ) && in_array( $method, array( 'POST', 'PUT' ), true ) ) {
 			$args['body'] = wp_json_encode( $body );
 		}
 
@@ -332,12 +336,82 @@ class PMPro_Constant_Contact_API {
 		}
 
 		if ( $code < 200 || $code >= 300 ) {
-			$error_message = ! empty( $data['error_message'] ) ? $data['error_message'] : "HTTP {$code}";
+			$error_message = $this->parse_error_message( $data, $code );
 			pmprocc_log( "API error ({$method} {$endpoint}): {$error_message}" );
 			return new WP_Error( 'api_error', $error_message, array( 'status' => $code, 'response' => $data ) );
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Extract a human-readable error message from a v3 API error response.
+	 *
+	 * Constant Contact v3 returns most errors as a JSON array of objects,
+	 * e.g. [ { "error_key": "...", "error_message": "..." } ], while the
+	 * OAuth/token endpoints return an object ( { "error": "...",
+	 * "error_description": "..." } ). Handle both, falling back to "HTTP {code}".
+	 *
+	 * @param mixed $data The decoded response body.
+	 * @param int   $code The HTTP status code.
+	 * @return string
+	 */
+	private function parse_error_message( $data, $code ) {
+		if ( is_array( $data ) ) {
+			// Array of error objects (most v3 endpoints).
+			if ( isset( $data[0] ) && is_array( $data[0] ) ) {
+				if ( ! empty( $data[0]['error_message'] ) ) {
+					return $data[0]['error_message'];
+				}
+				if ( ! empty( $data[0]['error_key'] ) ) {
+					return $data[0]['error_key'];
+				}
+			}
+
+			// Object form (token/OAuth endpoints, or single error object).
+			if ( ! empty( $data['error_message'] ) ) {
+				return $data['error_message'];
+			}
+			if ( ! empty( $data['error_description'] ) ) {
+				return $data['error_description'];
+			}
+			if ( ! empty( $data['error'] ) ) {
+				return $data['error'];
+			}
+		}
+
+		return "HTTP {$code}";
+	}
+
+	/**
+	 * Build a safe, non-sensitive log message for an OAuth/token endpoint failure.
+	 *
+	 * The token endpoint can echo submitted parameters or token material back in
+	 * its body, so we surface only the standard OAuth error fields and the HTTP
+	 * status code rather than the raw response body.
+	 *
+	 * @param array|null $body     Decoded JSON response body, if any.
+	 * @param array      $response Raw wp_remote_* response.
+	 * @return string Sanitized error message.
+	 */
+	private function parse_token_error( $body, $response ) {
+		$parts = array();
+
+		if ( is_array( $body ) ) {
+			if ( ! empty( $body['error'] ) && is_string( $body['error'] ) ) {
+				$parts[] = $body['error'];
+			}
+			if ( ! empty( $body['error_description'] ) && is_string( $body['error_description'] ) ) {
+				$parts[] = $body['error_description'];
+			}
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code ) {
+			$parts[] = "HTTP {$code}";
+		}
+
+		return ! empty( $parts ) ? implode( ' - ', $parts ) : __( 'Unknown error.', 'pmpro-constant-contact' );
 	}
 
 	/**
@@ -376,7 +450,7 @@ class PMPro_Constant_Contact_API {
 	 * Get all contact lists.
 	 *
 	 * @param bool $force_refresh Skip cache.
-	 * @return array
+	 * @return array|WP_Error Array of lists, or WP_Error on API failure.
 	 */
 	public function get_lists( $force_refresh = false ) {
 		if ( null !== $this->lists_cache && ! $force_refresh ) {
@@ -391,13 +465,15 @@ class PMPro_Constant_Contact_API {
 
 		$all_lists = array();
 		$endpoint  = '/contact_lists';
-		$query     = array( 'include_count' => 'true' );
+		$query     = array( 'include_membership_count' => 'active' );
 
 		// Paginate through results.
 		while ( $endpoint ) {
 			$result = $this->request( $endpoint, 'GET', array(), $query );
 			if ( is_wp_error( $result ) ) {
-				return array();
+				// Surface the error to the caller so the settings page can show a
+				// real diagnostic instead of an empty "No items found" list.
+				return $result;
 			}
 
 			if ( ! empty( $result['lists'] ) ) {
@@ -436,7 +512,7 @@ class PMPro_Constant_Contact_API {
 	 * Get all tags.
 	 *
 	 * @param bool $force_refresh Skip cache.
-	 * @return array
+	 * @return array|WP_Error Array of tags, or WP_Error on API failure.
 	 */
 	public function get_tags( $force_refresh = false ) {
 		if ( null !== $this->tags_cache && ! $force_refresh ) {
@@ -456,7 +532,9 @@ class PMPro_Constant_Contact_API {
 		while ( $endpoint ) {
 			$result = $this->request( $endpoint, 'GET', array(), $query );
 			if ( is_wp_error( $result ) ) {
-				return array();
+				// Surface the error to the caller so the settings page can show a
+				// real diagnostic instead of an empty "No items found" list.
+				return $result;
 			}
 
 			if ( ! empty( $result['tags'] ) ) {
@@ -500,12 +578,28 @@ class PMPro_Constant_Contact_API {
 			return $this->custom_fields_cache;
 		}
 
-		$result = $this->request( '/contact_custom_fields' );
-		if ( is_wp_error( $result ) ) {
-			return array();
+		$fields   = array();
+		$endpoint = '/contact_custom_fields';
+		$query    = array();
+
+		// Paginate through results (default page size 50; accounts may have up to 100).
+		while ( $endpoint ) {
+			$result = $this->request( $endpoint, 'GET', array(), $query );
+			if ( is_wp_error( $result ) ) {
+				return array();
+			}
+
+			if ( ! empty( $result['custom_fields'] ) ) {
+				$fields = array_merge( $fields, $result['custom_fields'] );
+			}
+
+			$endpoint = null;
+			$query    = array();
+			if ( ! empty( $result['_links']['next']['href'] ) ) {
+				$endpoint = $this->get_endpoint_from_link( $result['_links']['next']['href'], $query );
+			}
 		}
 
-		$fields = ! empty( $result['custom_fields'] ) ? $result['custom_fields'] : array();
 		$this->custom_fields_cache = $fields;
 
 		return $fields;
@@ -568,13 +662,14 @@ class PMPro_Constant_Contact_API {
 	/**
 	 * Get a contact by email.
 	 *
-	 * @param string $email Email address.
+	 * @param string $email   Email address.
+	 * @param string $include Comma-separated list of sub-resources to include.
 	 * @return array|null Contact data or null if not found.
 	 */
-	public function get_contact_by_email( $email ) {
+	public function get_contact_by_email( $email, $include = 'list_memberships,taggings,custom_fields' ) {
 		$result = $this->request( '/contacts', 'GET', array(), array(
 			'email'   => $email,
-			'include' => 'list_memberships,taggings,custom_fields',
+			'include' => $include,
 			'status'  => 'all',
 		) );
 
@@ -586,24 +681,33 @@ class PMPro_Constant_Contact_API {
 	}
 
 	/**
-	 * Update an existing contact.
+	 * Get a single contact by ID.
 	 *
 	 * @param string $contact_id Contact ID.
-	 * @param array  $data       Data to update.
+	 * @param string $include    Comma-separated list of sub-resources to include.
+	 * @return array|WP_Error Response data.
+	 */
+	public function get_contact( $contact_id, $include = '' ) {
+		$query = array();
+		if ( ! empty( $include ) ) {
+			$query['include'] = $include;
+		}
+		return $this->request( '/contacts/' . $contact_id, 'GET', array(), $query );
+	}
+
+	/**
+	 * Update an existing contact (full replace via PUT).
+	 *
+	 * The v3 Contacts API only supports a full-replacement PUT for updating a
+	 * single contact (there is no PATCH endpoint), so callers must supply the
+	 * complete contact resource, including any fields that should be retained.
+	 *
+	 * @param string $contact_id Contact ID.
+	 * @param array  $data       Full contact resource to write.
 	 * @return array|WP_Error Response data.
 	 */
 	public function update_contact( $contact_id, $data ) {
 		return $this->request( '/contacts/' . $contact_id, 'PUT', $data );
-	}
-
-	/**
-	 * Delete (remove) a contact.
-	 *
-	 * @param string $contact_id Contact ID.
-	 * @return array|WP_Error Response data.
-	 */
-	public function delete_contact( $contact_id ) {
-		return $this->request( '/contacts/' . $contact_id, 'DELETE' );
 	}
 
 	// ------------------------------------------------------------------
