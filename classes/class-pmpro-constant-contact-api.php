@@ -161,19 +161,13 @@ class PMPro_Constant_Contact_API {
 	 * @return bool True on success.
 	 */
 	public function exchange_code( $code, $verifier ) {
-		$options      = get_option( 'pmprocc_options', array() );
-		$api_key      = ! empty( $options['api_key'] ) ? $options['api_key'] : '';
 		$redirect_uri = admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_oauth_callback=1' );
 
-		$response = wp_remote_post( $this->token_url, array(
-			'body' => array(
-				'grant_type'    => 'authorization_code',
-				'code'          => $code,
-				'redirect_uri'  => $redirect_uri,
-				'client_id'     => $api_key,
-				'code_verifier' => $verifier,
-			),
-			'timeout' => 15,
+		$response = $this->token_request( array(
+			'grant_type'    => 'authorization_code',
+			'code'          => $code,
+			'redirect_uri'  => $redirect_uri,
+			'code_verifier' => $verifier,
 		) );
 
 		if ( is_wp_error( $response ) ) {
@@ -186,7 +180,11 @@ class PMPro_Constant_Contact_API {
 		if ( empty( $body['access_token'] ) ) {
 			// Log only the parsed error fields, never the raw response body, which
 			// can echo back submitted parameters or token material.
-			pmprocc_log( 'Token exchange failed: ' . $this->parse_token_error( $body, $response ) );
+			$error = $this->parse_token_error( $body, $response );
+			pmprocc_log( 'Token exchange failed: ' . $error );
+			// Surface the OAuth error on the settings page so admins can see why
+			// the connection failed without needing to enable debug logging first.
+			set_transient( 'pmprocc_last_token_error', $error, 5 * MINUTE_IN_SECONDS );
 			return false;
 		}
 
@@ -211,13 +209,9 @@ class PMPro_Constant_Contact_API {
 			return false;
 		}
 
-		$response = wp_remote_post( $this->token_url, array(
-			'body' => array(
-				'grant_type'    => 'refresh_token',
-				'refresh_token' => $tokens['refresh_token'],
-				'client_id'     => $api_key,
-			),
-			'timeout' => 15,
+		$response = $this->token_request( array(
+			'grant_type'    => 'refresh_token',
+			'refresh_token' => $tokens['refresh_token'],
 		) );
 
 		if ( is_wp_error( $response ) ) {
@@ -246,6 +240,46 @@ class PMPro_Constant_Contact_API {
 	}
 
 	/**
+	 * POST to the OAuth token endpoint with the correct client authentication.
+	 *
+	 * Constant Contact apps created with a client secret (the developer portal
+	 * default) are confidential clients: the token endpoint requires the client
+	 * ID and secret via HTTP Basic auth and rejects secret-less requests with
+	 * "invalid_client". Apps created as public clients instead authenticate with
+	 * PKCE only and pass the client_id in the request body. Support both: use
+	 * Basic auth when a secret is configured, otherwise fall back to PKCE-only.
+	 *
+	 * @param array $body Grant-specific body parameters.
+	 * @return array|WP_Error Raw wp_remote_post() response.
+	 */
+	private function token_request( $body ) {
+		$options    = get_option( 'pmprocc_options', array() );
+		$api_key    = ! empty( $options['api_key'] ) ? $options['api_key'] : '';
+		$api_secret = ! empty( $options['api_secret'] ) ? $options['api_secret'] : '';
+
+		$headers = array(
+			'Accept'       => 'application/json',
+			'Content-Type' => 'application/x-www-form-urlencoded',
+		);
+
+		if ( ! empty( $api_secret ) ) {
+			// Confidential client: authenticate with Basic auth. The client_id
+			// must not also be sent in the body or Okta rejects the request for
+			// supplying multiple client credentials.
+			$headers['Authorization'] = 'Basic ' . base64_encode( $api_key . ':' . $api_secret );
+		} else {
+			// Public (PKCE) client: client_id goes in the body.
+			$body['client_id'] = $api_key;
+		}
+
+		return wp_remote_post( $this->token_url, array(
+			'headers' => $headers,
+			'body'    => $body,
+			'timeout' => 15,
+		) );
+	}
+
+	/**
 	 * Store tokens in the database.
 	 *
 	 * @param array $token_data Response from token endpoint.
@@ -264,7 +298,9 @@ class PMPro_Constant_Contact_API {
 		$tokens = array(
 			'access_token'  => $token_data['access_token'],
 			'refresh_token' => $refresh_token,
-			'expires_at'    => time() + ( ! empty( $token_data['expires_in'] ) ? intval( $token_data['expires_in'] ) : 86400 ),
+			// Constant Contact access tokens last 28800 seconds (8 hours); use that
+			// as the fallback if the response omits expires_in.
+			'expires_at'    => time() + ( ! empty( $token_data['expires_in'] ) ? intval( $token_data['expires_in'] ) : 28800 ),
 		);
 		update_option( 'pmprocc_tokens', $tokens, false );
 	}
@@ -294,7 +330,10 @@ class PMPro_Constant_Contact_API {
 
 		$url = $this->api_url . $endpoint;
 		if ( ! empty( $query ) ) {
-			$url = add_query_arg( $query, $url );
+			// Use http_build_query() rather than add_query_arg(), which does not
+			// URL-encode values — emails containing '+' and pagination cursors
+			// would otherwise be corrupted in transit.
+			$url .= ( false === strpos( $url, '?' ) ? '?' : '&' ) . http_build_query( $query, '', '&' );
 		}
 
 		$args = array(

@@ -45,10 +45,11 @@ function pmprocc_options_validate( $input ) {
 		$output = array();
 	}
 
-	// API Key (client ID).
-	$output['api_key'] = ! empty( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
+	// API Key (client ID) and API Secret.
+	$output['api_key']    = ! empty( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
+	$output['api_secret'] = ! empty( $input['api_secret'] ) ? sanitize_text_field( $input['api_secret'] ) : '';
 
-	// If the full settings form wasn't rendered, only update the API key.
+	// If the full settings form wasn't rendered, only update the API credentials.
 	if ( empty( $input['full_form'] ) ) {
 		return $output;
 	}
@@ -154,6 +155,19 @@ function pmprocc_settings_page() {
 					</td>
 				</tr>
 				<tr>
+					<th scope="row">
+						<label for="pmprocc_api_secret"><?php esc_html_e( 'API Secret', 'pmpro-constant-contact' ); ?></label>
+					</th>
+					<td>
+						<input type="password" id="pmprocc_api_secret" name="pmprocc_options[api_secret]"
+							value="<?php echo esc_attr( ! empty( $options['api_secret'] ) ? $options['api_secret'] : '' ); ?>"
+							class="regular-text" autocomplete="off" />
+						<p class="description">
+							<?php esc_html_e( 'The client secret generated for your application. Constant Contact only shows this once when the app is created. Leave blank only if your application was created as a public (PKCE) client without a secret.', 'pmpro-constant-contact' ); ?>
+						</p>
+					</td>
+				</tr>
+				<tr>
 					<th scope="row"><?php esc_html_e( 'Connection Status', 'pmpro-constant-contact' ); ?></th>
 					<td>
 						<?php if ( $api->is_connected() ) : ?>
@@ -184,7 +198,7 @@ function pmprocc_settings_page() {
 								</a>
 							<?php endif; ?>
 						<?php else : ?>
-							<span class="description"><?php esc_html_e( 'Enter your API Key and save to connect.', 'pmpro-constant-contact' ); ?></span>
+							<span class="description"><?php esc_html_e( 'Enter your API Key and Secret, then save to connect.', 'pmpro-constant-contact' ); ?></span>
 						<?php endif; ?>
 					</td>
 				</tr>
@@ -385,6 +399,10 @@ function pmprocc_render_checkbox_list( $name, $items, $selected, $id_key ) {
  * Display admin notices.
  */
 function pmprocc_admin_notices() {
+	if ( ! empty( $_GET['settings-updated'] ) ) {
+		echo '<div class="notice notice-success"><p>' . esc_html__( 'Settings saved.', 'pmpro-constant-contact' ) . '</p></div>';
+	}
+
 	if ( ! empty( $_GET['pmprocc_connected'] ) ) {
 		echo '<div class="notice notice-success"><p>' . esc_html__( 'Successfully connected to Constant Contact!', 'pmpro-constant-contact' ) . '</p></div>';
 	}
@@ -399,9 +417,21 @@ function pmprocc_admin_notices() {
 			'oauth_denied'    => __( 'Authorization was denied. Please try again.', 'pmpro-constant-contact' ),
 			'state_mismatch'  => __( 'Security validation failed. Please try connecting again.', 'pmpro-constant-contact' ),
 			'verifier_expired' => __( 'Authorization session expired. Please try connecting again.', 'pmpro-constant-contact' ),
-			'token_exchange'  => __( 'Failed to complete authorization. Check your API Key and try again.', 'pmpro-constant-contact' ),
+			'token_exchange'  => __( 'Failed to complete authorization. Check your API Key and API Secret and try again.', 'pmpro-constant-contact' ),
 		);
 		$message = isset( $messages[ $error ] ) ? $messages[ $error ] : __( 'An error occurred. Please try again.', 'pmpro-constant-contact' );
+
+		// Include the OAuth error returned by Constant Contact, if we have one,
+		// so the admin can see why the token exchange failed.
+		if ( 'token_exchange' === $error ) {
+			$token_error = get_transient( 'pmprocc_last_token_error' );
+			if ( ! empty( $token_error ) ) {
+				delete_transient( 'pmprocc_last_token_error' );
+				/* translators: %s: OAuth error message returned by Constant Contact */
+				$message .= ' ' . sprintf( __( 'Constant Contact said: %s', 'pmpro-constant-contact' ), $token_error );
+			}
+		}
+
 		echo '<div class="notice notice-error"><p>' . esc_html( $message ) . '</p></div>';
 	}
 }

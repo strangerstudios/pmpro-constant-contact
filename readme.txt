@@ -16,7 +16,7 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 
 = Features =
 
-* **OAuth 2.0 PKCE Authentication** — Secure connection without storing a client secret in your plugin files.
+* **OAuth 2.0 Authentication** — Secure connection using your Constant Contact application's API Key and Secret (PKCE is used automatically for public clients without a secret).
 * **List Management** — Assign Constant Contact lists to each membership level. Members are automatically added when they gain a level and optionally removed when they lose it.
 * **Tag Management** — Assign tags per membership level. Only PMPro-controlled tags are modified; manually applied tags are preserved.
 * **Non-Member Lists** — Automatically subscribe new users without a membership level to designated lists.
@@ -35,18 +35,18 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 1. Upload the `pmpro-constant-contact` folder to the `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Navigate to Memberships > Constant Contact in your WordPress admin.
-4. Enter your Constant Contact API Key (Client ID) from the [Constant Contact Developer Portal](https://app.constantcontact.com/pages/dma/portal/).
+4. Enter your Constant Contact API Key (Client ID) and API Secret from the [Constant Contact Developer Portal](https://app.constantcontact.com/pages/dma/portal/).
 5. Save settings, then click "Connect to Constant Contact" to authorize.
 6. Configure lists and tags for each membership level.
 
 == Frequently Asked Questions ==
 
-= Where do I get my API Key? =
+= Where do I get my API Key and Secret? =
 
 1. Go to the [Constant Contact Developer Portal](https://app.constantcontact.com/pages/dma/portal/).
 2. Create a new application.
 3. Set the Redirect URI to your WordPress admin URL (shown on the settings page).
-4. Copy the API Key (Client ID) into the plugin settings.
+4. Copy the API Key (Client ID) and the generated Client Secret into the plugin settings. Note: Constant Contact only displays the secret once when it is generated, so copy it right away.
 
 = Does this sync existing members? =
 
@@ -64,7 +64,7 @@ Depending on your settings, the member can be removed from the lists associated 
 
 = 2.0 - 2026-03-31 =
 * Complete rewrite using Constant Contact v3 API.
-* OAuth 2.0 PKCE authentication flow.
+* OAuth 2.0 authentication flow (API Key + Secret, with PKCE support for public clients).
 * List and tag assignment per membership level.
 * Custom fields for membership level data.
 * Background sync via PMPro Action Scheduler.
