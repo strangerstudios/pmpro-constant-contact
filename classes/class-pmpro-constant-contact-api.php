@@ -2,8 +2,8 @@
 /**
  * Constant Contact v3 API wrapper.
  *
- * Handles OAuth 2.0 PKCE authentication and all API calls
- * to the Constant Contact v3 REST API.
+ * Handles OAuth 2.0 authentication (client secret via Basic auth, or PKCE
+ * for public clients) and all API calls to the Constant Contact v3 REST API.
  *
  * @since 2.0
  */

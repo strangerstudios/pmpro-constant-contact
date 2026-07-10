@@ -38,16 +38,36 @@ add_action( 'admin_init', 'pmprocc_admin_init' );
  */
 function pmprocc_options_validate( $input ) {
 	// Start from the saved options so settings that weren't rendered on the
-	// form (e.g. while disconnected, only the API key field is shown) are
-	// preserved instead of being wiped.
+	// form (e.g. credentials while connected) are preserved instead of being
+	// wiped.
 	$output = get_option( 'pmprocc_options', array() );
 	if ( ! is_array( $output ) ) {
 		$output = array();
 	}
+	if ( ! is_array( $input ) ) {
+		$input = array();
+	}
 
-	// API Key (client ID) and API Secret.
-	$output['api_key']    = ! empty( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
-	$output['api_secret'] = ! empty( $input['api_secret'] ) ? sanitize_text_field( $input['api_secret'] ) : '';
+	// API credentials are hidden while connected, so only update values that
+	// were actually submitted. If either credential changes, invalidate tokens
+	// and account-specific caches so the new application must be authorized.
+	$old_api_key    = isset( $output['api_key'] ) ? $output['api_key'] : '';
+	$old_api_secret = isset( $output['api_secret'] ) ? $output['api_secret'] : '';
+
+	if ( array_key_exists( 'api_key', $input ) ) {
+		$output['api_key'] = ! empty( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
+	}
+	if ( array_key_exists( 'api_secret', $input ) ) {
+		$output['api_secret'] = ! empty( $input['api_secret'] ) ? sanitize_text_field( $input['api_secret'] ) : '';
+	}
+
+	$new_api_key    = isset( $output['api_key'] ) ? $output['api_key'] : '';
+	$new_api_secret = isset( $output['api_secret'] ) ? $output['api_secret'] : '';
+	if ( $new_api_key !== $old_api_key || $new_api_secret !== $old_api_secret ) {
+		delete_option( 'pmprocc_tokens' );
+		delete_transient( 'pmprocc_all_lists' );
+		delete_transient( 'pmprocc_all_tags' );
+	}
 
 	// If the full settings form wasn't rendered, only update the API credentials.
 	if ( empty( $input['full_form'] ) ) {
@@ -116,47 +136,49 @@ function pmprocc_settings_page() {
 
 			<h2><?php esc_html_e( 'Authentication', 'pmpro-constant-contact' ); ?></h2>
 			<table class="form-table">
-				<tr>
-					<th scope="row">
-						<label for="pmprocc_api_key"><?php esc_html_e( 'API Key (Client ID)', 'pmpro-constant-contact' ); ?></label>
-					</th>
-					<td>
-						<input type="text" id="pmprocc_api_key" name="pmprocc_options[api_key]"
-							value="<?php echo esc_attr( ! empty( $options['api_key'] ) ? $options['api_key'] : '' ); ?>"
-							class="regular-text" />
-						<p class="description">
-							<?php
-							printf(
-								/* translators: %s: Constant Contact developer portal URL */
-								esc_html__( 'Create an application at %s to get your API Key.', 'pmpro-constant-contact' ),
-								'<a href="https://app.constantcontact.com/pages/dma/portal/" target="_blank">Constant Contact Developer Portal</a>'
-							);
-							?>
-						</p>
-						<p class="description">
-							<?php
-							printf(
-								/* translators: %s: OAuth redirect URI */
-								esc_html__( 'Set your application\'s Redirect URI to: %s', 'pmpro-constant-contact' ),
-								'<code>' . esc_html( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_oauth_callback=1' ) ) . '</code>'
-							);
-							?>
-						</p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						<label for="pmprocc_api_secret"><?php esc_html_e( 'API Secret', 'pmpro-constant-contact' ); ?></label>
-					</th>
-					<td>
-						<input type="password" id="pmprocc_api_secret" name="pmprocc_options[api_secret]"
-							value="<?php echo esc_attr( ! empty( $options['api_secret'] ) ? $options['api_secret'] : '' ); ?>"
-							class="regular-text" autocomplete="off" />
-						<p class="description">
-							<?php esc_html_e( 'The client secret generated for your application. Constant Contact only shows this once when the app is created. Leave blank only if your application was created as a public (PKCE) client without a secret.', 'pmpro-constant-contact' ); ?>
-						</p>
-					</td>
-				</tr>
+				<?php if ( ! $api->is_connected() ) : ?>
+					<tr>
+						<th scope="row">
+							<label for="pmprocc_api_key"><?php esc_html_e( 'API Key (Client ID)', 'pmpro-constant-contact' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="pmprocc_api_key" name="pmprocc_options[api_key]"
+								value="<?php echo esc_attr( ! empty( $options['api_key'] ) ? $options['api_key'] : '' ); ?>"
+								class="regular-text" />
+							<p class="description">
+								<?php
+								printf(
+									/* translators: %s: Constant Contact developer portal URL */
+									esc_html__( 'Create an application at %s to get your API Key.', 'pmpro-constant-contact' ),
+									'<a href="https://app.constantcontact.com/pages/dma/portal/" target="_blank">Constant Contact Developer Portal</a>'
+								);
+								?>
+							</p>
+							<p class="description">
+								<?php
+								printf(
+									/* translators: %s: OAuth redirect URI */
+									esc_html__( 'Set your application\'s Redirect URI to: %s', 'pmpro-constant-contact' ),
+									'<code>' . esc_html( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_oauth_callback=1' ) ) . '</code>'
+								);
+								?>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="pmprocc_api_secret"><?php esc_html_e( 'API Secret', 'pmpro-constant-contact' ); ?></label>
+						</th>
+						<td>
+							<input type="password" id="pmprocc_api_secret" name="pmprocc_options[api_secret]"
+								value="<?php echo esc_attr( ! empty( $options['api_secret'] ) ? $options['api_secret'] : '' ); ?>"
+								class="regular-text" autocomplete="off" />
+							<p class="description">
+								<?php esc_html_e( 'The client secret generated for your application. Constant Contact only shows this once when the app is created. Leave blank only if your application was created as a public (PKCE) client without a secret.', 'pmpro-constant-contact' ); ?>
+							</p>
+						</td>
+					</tr>
+				<?php endif; ?>
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Connection Status', 'pmpro-constant-contact' ); ?></th>
 					<td>
