@@ -193,6 +193,27 @@ function pmprocc_settings_page() {
 						<?php endif; ?>
 					</td>
 				</tr>
+				<?php if ( $api->is_connected() ) : ?>
+					<tr>
+						<th scope="row">
+							<label for="pmprocc_master_list"><?php esc_html_e( 'Member List', 'pmpro-constant-contact' ); ?></label>
+						</th>
+						<td>
+							<select id="pmprocc_master_list" name="pmprocc_options[master_list]">
+								<option value=""><?php esc_html_e( '— Select a list —', 'pmpro-constant-contact' ); ?></option>
+								<?php foreach ( $lists as $list ) : ?>
+									<option value="<?php echo esc_attr( $list['list_id'] ); ?>" <?php selected( ! empty( $options['master_list'] ) ? $options['master_list'] : '', $list['list_id'] ); ?>>
+										<?php echo esc_html( $list['name'] ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<p class="description"><?php esc_html_e( 'All members are added to this list. Use the tags below to segment members by level.', 'pmpro-constant-contact' ); ?></p>
+							<?php if ( empty( $options['master_list'] ) ) : ?>
+								<p class="description"><strong><?php esc_html_e( 'Syncing is disabled until a list is selected.', 'pmpro-constant-contact' ); ?></strong></p>
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endif; ?>
 			</table>
 
 			<?php if ( $api->is_connected() ) : ?>
@@ -201,7 +222,7 @@ function pmprocc_settings_page() {
 
 				<hr />
 				<h2>
-					<?php esc_html_e( 'List & Tag Settings', 'pmpro-constant-contact' ); ?>
+					<?php esc_html_e( 'Membership Level Tags', 'pmpro-constant-contact' ); ?>
 					<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_refresh=1' ), 'pmprocc_refresh' ) ); ?>" class="page-title-action">
 						<?php esc_html_e( 'Refresh Lists & Tags', 'pmpro-constant-contact' ); ?>
 					</a>
@@ -220,30 +241,6 @@ function pmprocc_settings_page() {
 
 				<?php if ( ! empty( $levels ) ) : ?>
 
-					<h3><?php esc_html_e( 'Member List', 'pmpro-constant-contact' ); ?></h3>
-					<p class="description"><?php esc_html_e( 'All members are added to this list. Use the tags below to segment members by level.', 'pmpro-constant-contact' ); ?></p>
-					<table class="form-table">
-						<tr>
-							<th scope="row">
-								<label for="pmprocc_master_list"><?php esc_html_e( 'List', 'pmpro-constant-contact' ); ?></label>
-							</th>
-							<td>
-								<select id="pmprocc_master_list" name="pmprocc_options[master_list]">
-									<option value=""><?php esc_html_e( '— Select a list —', 'pmpro-constant-contact' ); ?></option>
-									<?php foreach ( $lists as $list ) : ?>
-										<option value="<?php echo esc_attr( $list['list_id'] ); ?>" <?php selected( ! empty( $options['master_list'] ) ? $options['master_list'] : '', $list['list_id'] ); ?>>
-											<?php echo esc_html( $list['name'] ); ?>
-										</option>
-									<?php endforeach; ?>
-								</select>
-								<?php if ( empty( $options['master_list'] ) ) : ?>
-									<p class="description"><strong><?php esc_html_e( 'Syncing is disabled until a list is selected.', 'pmpro-constant-contact' ); ?></strong></p>
-								<?php endif; ?>
-							</td>
-						</tr>
-					</table>
-
-					<h3><?php esc_html_e( 'Membership Level Tags', 'pmpro-constant-contact' ); ?></h3>
 					<p class="description"><?php esc_html_e( 'Assign tags for each membership level. Members are tagged when they have the corresponding level.', 'pmpro-constant-contact' ); ?></p>
 
 					<table class="form-table">
