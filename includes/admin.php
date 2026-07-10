@@ -240,7 +240,10 @@ function pmprocc_settings_page() {
 
 				<?php if ( ! empty( $levels ) ) : ?>
 
-					<p class="description"><?php esc_html_e( 'Assign tags for each membership level. Members are tagged when they have the corresponding level.', 'pmpro-constant-contact' ); ?></p>
+					<p class="description">
+						<?php esc_html_e( 'Assign tags for each membership level. Members are tagged when they have the corresponding level.', 'pmpro-constant-contact' ); ?>
+						<a href="https://app.constantcontact.com/contacts/tags" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Create and manage tags in Constant Contact.', 'pmpro-constant-contact' ); ?></a>
+					</p>
 
 					<table class="form-table">
 						<?php foreach ( $levels as $level ) : ?>
@@ -349,7 +352,7 @@ function pmprocc_settings_page() {
  */
 function pmprocc_render_checkbox_list( $name, $items, $selected, $id_key ) {
 	if ( empty( $items ) ) {
-		echo '<p class="description">' . esc_html__( 'No items found. Check your connection or refresh.', 'pmpro-constant-contact' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'No tags found.', 'pmpro-constant-contact' ) . ' <a href="https://app.constantcontact.com/contacts/tags" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Create tags in Constant Contact', 'pmpro-constant-contact' ) . '</a>, ' . esc_html__( 'then refresh.', 'pmpro-constant-contact' ) . '</p>';
 		return;
 	}
 
