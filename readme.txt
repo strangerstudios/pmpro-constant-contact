@@ -2,7 +2,7 @@
 Contributors: strangerstudios, flintfromthebasement
 Tags: pmpro, constant contact, email marketing, membership, sync
 Requires at least: 5.6
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.4
 Stable tag: 2.0
 License: GPLv2 or later
@@ -25,6 +25,8 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 = Hooks =
 
 * `pmprocc_contact_data` — Modify contact data before sending to Constant Contact (e.g. add custom fields).
+* `pmprocc_contact_tag_ids` — Modify the set of tag IDs assigned to a contact based on their membership levels.
+* `pmprocc_controlled_tag_ids` — Modify the set of tag IDs the plugin is allowed to add and remove.
 
 == Installation ==
 
@@ -61,6 +63,14 @@ Level-specific tags are removed (if tag removal is enabled). The contact remains
 Constant Contact tags are account-wide and can be used to filter recipients when sending an email, so a single list plus per-level tags keeps members segmented without maintaining multiple lists. Note: accounts with more than 10,000 contacts cannot filter by tag at send time and must use a custom segment instead (active custom segments are limited on the Lite and Standard plans).
 
 == Changelog ==
+
+= 2.0 - 2026-07-10 =
+* FEATURE: Complete rewrite of the Add On using the Constant Contact v3 API. #17 (@flintfromthebasement, @dparker1005)
+* FEATURE: Automatically tag members in Constant Contact based on their membership levels.
+* FEATURE: Connect securely to Constant Contact with OAuth 2.0, including PKCE support for applications without a client secret.
+* FEATURE: Sync members in the background using the PMPro Action Scheduler for faster checkouts.
+* FEATURE: Enable debug logging to troubleshoot syncs and API activity.
+* ENHANCEMENT: Contacts in Constant Contact are automatically kept in sync when a member changes their email address in WordPress.
 
 = 1.0.3 =
 * Legacy version using Constant Contact v2 API (deprecated).
