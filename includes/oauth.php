@@ -72,8 +72,6 @@ function pmprocc_handle_oauth_callback() {
 	$success = $api->exchange_code( $code, $verifier );
 
 	if ( $success ) {
-		// Ensure our custom fields exist on first connect.
-		$api->ensure_custom_fields();
 		wp_safe_redirect( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_connected=1' ) );
 	} else {
 		wp_safe_redirect( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_error=token_exchange' ) );

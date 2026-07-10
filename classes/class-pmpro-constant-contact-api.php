@@ -69,13 +69,6 @@ class PMPro_Constant_Contact_API {
 	private $tags_cache = null;
 
 	/**
-	 * Cached custom fields.
-	 *
-	 * @var array|null
-	 */
-	private $custom_fields_cache = null;
-
-	/**
 	 * Get singleton instance.
 	 *
 	 * @return PMPro_Constant_Contact_API|null
@@ -600,88 +593,6 @@ class PMPro_Constant_Contact_API {
 		set_transient( 'pmprocc_all_tags', $all_tags, 12 * HOUR_IN_SECONDS );
 
 		return $all_tags;
-	}
-
-	// ------------------------------------------------------------------
-	// Custom Fields
-	// ------------------------------------------------------------------
-
-	/**
-	 * Get all custom fields.
-	 *
-	 * @param bool $force_refresh Skip cache.
-	 * @return array
-	 */
-	public function get_custom_fields( $force_refresh = false ) {
-		if ( null !== $this->custom_fields_cache && ! $force_refresh ) {
-			return $this->custom_fields_cache;
-		}
-
-		$fields   = array();
-		$endpoint = '/contact_custom_fields';
-		$query    = array();
-
-		// Paginate through results (default page size 50; accounts may have up to 100).
-		while ( $endpoint ) {
-			$result = $this->request( $endpoint, 'GET', array(), $query );
-			if ( is_wp_error( $result ) ) {
-				return array();
-			}
-
-			if ( ! empty( $result['custom_fields'] ) ) {
-				$fields = array_merge( $fields, $result['custom_fields'] );
-			}
-
-			$endpoint = null;
-			$query    = array();
-			if ( ! empty( $result['_links']['next']['href'] ) ) {
-				$endpoint = $this->get_endpoint_from_link( $result['_links']['next']['href'], $query );
-			}
-		}
-
-		$this->custom_fields_cache = $fields;
-
-		return $fields;
-	}
-
-	/**
-	 * Ensure our custom fields exist in Constant Contact.
-	 *
-	 * Creates 'pmpro_level_id' and 'pmpro_level_name' fields if they don't exist.
-	 *
-	 * @return array Map of field name => custom_field_id.
-	 */
-	public function ensure_custom_fields() {
-		$fields = $this->get_custom_fields( true );
-		$map    = array();
-
-		foreach ( $fields as $field ) {
-			if ( in_array( $field['label'], array( 'pmpro_level_id', 'pmpro_level_name' ), true ) ) {
-				$map[ $field['label'] ] = $field['custom_field_id'];
-			}
-		}
-
-		$needed = array(
-			'pmpro_level_id'   => 'string',
-			'pmpro_level_name' => 'string',
-		);
-
-		foreach ( $needed as $label => $type ) {
-			if ( empty( $map[ $label ] ) ) {
-				$result = $this->request( '/contact_custom_fields', 'POST', array(
-					'label' => $label,
-					'type'  => $type,
-				) );
-				if ( ! is_wp_error( $result ) && ! empty( $result['custom_field_id'] ) ) {
-					$map[ $label ] = $result['custom_field_id'];
-				}
-			}
-		}
-
-		// Cache the field ID map.
-		update_option( 'pmprocc_custom_field_map', $map );
-
-		return $map;
 	}
 
 	// ------------------------------------------------------------------

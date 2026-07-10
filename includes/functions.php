@@ -117,9 +117,9 @@ add_action( 'init', 'pmprocc_register_action_scheduler' );
 /**
  * Sync a single user to Constant Contact.
  *
- * Adds members to the configured list, keeps their level custom fields
- * up to date, and optionally manages tags. When a user has no remaining
- * membership levels, they are optionally removed from the list.
+ * Adds members to the configured list and optionally manages tags. When a
+ * user has no remaining membership levels, they are optionally removed from
+ * the list.
  *
  * @param int  $user_id     WordPress user ID.
  * @param bool $update_tags Whether to sync tags.
@@ -161,46 +161,6 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	}
 
 	// ------------------------------------------------------------------
-	// Build custom fields.
-	// ------------------------------------------------------------------
-	$field_map = get_option( 'pmprocc_custom_field_map', array() );
-
-	// If the map is empty (e.g. upgraded from v1, or fields were removed in
-	// Constant Contact), rebuild it rather than silently skipping custom fields.
-	if ( empty( $field_map ) ) {
-		$field_map = $api->ensure_custom_fields();
-	}
-
-	// Note: the sign_up_form endpoint ignores blank custom field values, so
-	// these cannot be cleared through it. For a contact kept on the list after
-	// cancellation, the fields retain the most recent membership; use tags to
-	// segment by active membership.
-	$custom_fields = array();
-
-	if ( ! empty( $field_map['pmpro_level_id'] ) && ! empty( $level_ids ) ) {
-		$custom_fields[] = array(
-			'custom_field_id' => $field_map['pmpro_level_id'],
-			'value'           => implode( ',', $level_ids ),
-		);
-	}
-
-	if ( ! empty( $field_map['pmpro_level_name'] ) && ! empty( $levels ) ) {
-		$custom_fields[] = array(
-			'custom_field_id' => $field_map['pmpro_level_name'],
-			'value'           => implode( ', ', wp_list_pluck( $levels, 'name' ) ),
-		);
-	}
-
-	/**
-	 * Filter custom fields sent to Constant Contact for a user.
-	 *
-	 * @param array    $custom_fields Array of custom field data.
-	 * @param WP_User  $user          The WordPress user.
-	 * @param array    $levels        The user's membership levels.
-	 */
-	$custom_fields = apply_filters( 'pmprocc_custom_fields', $custom_fields, $user, $levels );
-
-	// ------------------------------------------------------------------
 	// Upsert the contact, or remove a cancelled member from the list.
 	// ------------------------------------------------------------------
 	$remove_from_list = empty( $level_ids ) && ( empty( $options['unsubscribe'] ) || 'no' !== $options['unsubscribe'] );
@@ -220,12 +180,11 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 			$contact_data['last_name'] = $user->last_name;
 		}
 
-		if ( ! empty( $custom_fields ) ) {
-			$contact_data['custom_fields'] = $custom_fields;
-		}
-
 		/**
 		 * Filter contact data before sending to Constant Contact.
+		 *
+		 * Custom fields can be added here as a 'custom_fields' array of
+		 * { custom_field_id, value } entries.
 		 *
 		 * @param array   $contact_data Contact data for the upsert.
 		 * @param WP_User $user         The WordPress user.

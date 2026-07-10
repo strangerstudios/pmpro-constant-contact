@@ -83,8 +83,8 @@ function pmprocc_settings_page() {
 	$options = get_option( 'pmprocc_options', array() );
 	$api     = PMPro_Constant_Contact_API::get_instance();
 
-	// The refresh action triggers remote writes (custom-field creation), so gate
-	// it behind a nonce to prevent it firing from a forged GET link (CSRF).
+	// Gate the refresh action behind a nonce so a forged GET link can't
+	// repeatedly bust the lists/tags cache (CSRF hygiene).
 	$force_refresh = ! empty( $_GET['pmprocc_refresh'] )
 		&& isset( $_GET['_wpnonce'] )
 		&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'pmprocc_refresh' );
@@ -105,14 +105,7 @@ function pmprocc_settings_page() {
 		$tags       = array();
 	}
 
-	// Rebuild the custom field ID map so it doesn't go stale (e.g. when
-	// upgrading from a prior version, or if fields were changed in Constant
-	// Contact). Refreshes from the remote on the "Refresh Lists & Tags" action
-	// or whenever the map is currently empty.
-	if ( $api->is_connected() && ( $force_refresh || ! get_option( 'pmprocc_custom_field_map' ) ) ) {
-		$api->ensure_custom_fields();
-	}
-	$levels        = function_exists( 'pmpro_getAllLevels' ) ? pmpro_getAllLevels( true, true ) : array();
+	$levels = function_exists( 'pmpro_getAllLevels' ) ? pmpro_getAllLevels( true, true ) : array();
 	?>
 	<div class="wrap pmpro_admin pmpro-admin">
 		<h1><?php esc_html_e( 'Constant Contact Integration', 'pmpro-constant-contact' ); ?></h1>
