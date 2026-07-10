@@ -17,7 +17,7 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 = Features =
 
 * **OAuth 2.0 Authentication** — Secure connection using your Constant Contact application's API Key and Secret (PKCE is used automatically for public clients without a secret).
-* **Member List** — All members are added to a single Constant Contact list of your choice, and optionally removed when they no longer have a membership.
+* **Member List** — All members are added to a single Constant Contact list of your choice.
 * **Tags per Level** — Assign tags for each membership level to segment your members. Only PMPro-controlled tags are modified; manually applied tags are preserved.
 * **Profile Sync** — Optionally sync contact data and tags when a user updates their WordPress profile.
 * **Background Processing** — Uses PMPro Action Scheduler for non-blocking sync operations.
@@ -55,7 +55,7 @@ No. The plugin only manages tags that are mapped to PMPro membership levels. Any
 
 = What happens when a member cancels? =
 
-Level-specific tags are removed (if tag removal is enabled), and depending on your settings the member can also be removed from the member list. Constant Contact bills by active contact count, so removing cancelled members can reduce costs.
+Level-specific tags are removed (if tag removal is enabled). The contact remains on your member list so you can continue to reach them with win-back campaigns; remove or unsubscribe contacts directly in Constant Contact if desired. Note that Constant Contact bills by active contact count.
 
 = Why one list with tags instead of a list per level? =
 

@@ -117,9 +117,9 @@ add_action( 'init', 'pmprocc_register_action_scheduler' );
 /**
  * Sync a single user to Constant Contact.
  *
- * Adds members to the configured list and optionally manages tags. When a
- * user has no remaining membership levels, they are optionally removed from
- * the list.
+ * Adds members to the configured list and optionally manages tags. Matching
+ * the Kit Add On, contacts are never removed from the list — losing a
+ * membership level only removes the PMPro-controlled tags.
  *
  * @param int  $user_id     WordPress user ID.
  * @param bool $update_tags Whether to sync tags.
@@ -161,69 +161,47 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	}
 
 	// ------------------------------------------------------------------
-	// Upsert the contact, or remove a cancelled member from the list.
+	// Upsert the contact.
 	// ------------------------------------------------------------------
-	$remove_from_list = empty( $level_ids ) && ( empty( $options['unsubscribe'] ) || 'no' !== $options['unsubscribe'] );
+	$contact_data = array(
+		'email_address'    => $user->user_email,
+		'create_source'    => 'Account',
+		'list_memberships' => array( $master_list ),
+	);
 
-	if ( ! $remove_from_list ) {
-		$contact_data = array(
-			'email_address'    => $user->user_email,
-			'create_source'    => 'Account',
-			'list_memberships' => array( $master_list ),
-		);
-
-		// The sign_up_form endpoint rejects empty name fields.
-		if ( '' !== $user->first_name ) {
-			$contact_data['first_name'] = $user->first_name;
-		}
-		if ( '' !== $user->last_name ) {
-			$contact_data['last_name'] = $user->last_name;
-		}
-
-		/**
-		 * Filter contact data before sending to Constant Contact.
-		 *
-		 * Custom fields can be added here as a 'custom_fields' array of
-		 * { custom_field_id, value } entries.
-		 *
-		 * @param array   $contact_data Contact data for the upsert.
-		 * @param WP_User $user         The WordPress user.
-		 * @param array   $levels       The user's membership levels.
-		 */
-		$contact_data = apply_filters( 'pmprocc_contact_data', $contact_data, $user, $levels );
-
-		$result = $api->upsert_contact( $contact_data );
-
-		if ( is_wp_error( $result ) ) {
-			pmprocc_log( "Failed to upsert contact for user {$user_id}: " . $result->get_error_message() );
-			return;
-		}
-
-		$contact_id = ! empty( $result['contact_id'] ) ? $result['contact_id'] : '';
-		if ( $contact_id ) {
-			update_user_meta( $user_id, 'pmprocc_contact_id', $contact_id );
-		}
-
-		pmprocc_log( "Upserted contact {$contact_id} for user {$user_id}" );
-	} else {
-		// The user has no membership levels and "remove from list on cancel" is
-		// enabled, so don't upsert (that would re-add them). Resolve the existing
-		// contact so the list and tag removals below still run. Prefer the stored
-		// contact ID, falling back to a remote email lookup.
-		$contact_id = $stored_contact_id;
-		if ( empty( $contact_id ) ) {
-			$contact    = $api->get_contact_by_email( $user->user_email );
-			$contact_id = ! empty( $contact['contact_id'] ) ? $contact['contact_id'] : '';
-		}
-
-		if ( empty( $contact_id ) ) {
-			pmprocc_log( "No existing contact found for user {$user_id}; nothing to remove." );
-			return;
-		}
-
-		$api->remove_contacts_from_lists( array( $contact_id ), array( $master_list ) );
-		pmprocc_log( "Removed contact {$contact_id} from list {$master_list} (membership cancelled)." );
+	// The sign_up_form endpoint rejects empty name fields.
+	if ( '' !== $user->first_name ) {
+		$contact_data['first_name'] = $user->first_name;
 	}
+	if ( '' !== $user->last_name ) {
+		$contact_data['last_name'] = $user->last_name;
+	}
+
+	/**
+	 * Filter contact data before sending to Constant Contact.
+	 *
+	 * Custom fields can be added here as a 'custom_fields' array of
+	 * { custom_field_id, value } entries.
+	 *
+	 * @param array   $contact_data Contact data for the upsert.
+	 * @param WP_User $user         The WordPress user.
+	 * @param array   $levels       The user's membership levels.
+	 */
+	$contact_data = apply_filters( 'pmprocc_contact_data', $contact_data, $user, $levels );
+
+	$result = $api->upsert_contact( $contact_data );
+
+	if ( is_wp_error( $result ) ) {
+		pmprocc_log( "Failed to upsert contact for user {$user_id}: " . $result->get_error_message() );
+		return;
+	}
+
+	$contact_id = ! empty( $result['contact_id'] ) ? $result['contact_id'] : '';
+	if ( $contact_id ) {
+		update_user_meta( $user_id, 'pmprocc_contact_id', $contact_id );
+	}
+
+	pmprocc_log( "Upserted contact {$contact_id} for user {$user_id}" );
 
 	// ------------------------------------------------------------------
 	// Handle tags.

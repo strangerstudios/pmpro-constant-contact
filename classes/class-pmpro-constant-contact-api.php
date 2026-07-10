@@ -692,21 +692,4 @@ class PMPro_Constant_Contact_API {
 		) );
 	}
 
-	// ------------------------------------------------------------------
-	// Bulk List Operations
-	// ------------------------------------------------------------------
-
-	/**
-	 * Remove contacts from lists in bulk.
-	 *
-	 * @param array $contact_ids Array of contact IDs.
-	 * @param array $list_ids    Array of list IDs.
-	 * @return array|WP_Error Activity response.
-	 */
-	public function remove_contacts_from_lists( $contact_ids, $list_ids ) {
-		return $this->request( '/activities/remove_list_memberships', 'POST', array(
-			'source'   => array( 'contact_ids' => $contact_ids ),
-			'list_ids' => $list_ids,
-		) );
-	}
 }

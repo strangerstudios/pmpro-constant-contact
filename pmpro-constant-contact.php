@@ -47,7 +47,6 @@ function pmprocc_activation() {
 	$defaults = array(
 		'sync_profile_update' => 'yes',
 		'remove_tags'         => 1,
-		'unsubscribe'         => 'yes',
 		'background_sync'     => 1,
 		'logging_enabled'     => 0,
 	);

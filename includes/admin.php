@@ -58,7 +58,6 @@ function pmprocc_options_validate( $input ) {
 	// upgraded and fresh installs behave the same.
 	$output['sync_profile_update'] = ! empty( $input['sync_profile_update'] ) ? sanitize_text_field( $input['sync_profile_update'] ) : 'yes';
 	$output['remove_tags']         = ! empty( $input['remove_tags'] ) ? 1 : 0;
-	$output['unsubscribe']         = ! empty( $input['unsubscribe'] ) ? sanitize_text_field( $input['unsubscribe'] ) : 'yes';
 	$output['background_sync']     = ! empty( $input['background_sync'] ) ? 1 : 0;
 	$output['logging_enabled']     = ! empty( $input['logging_enabled'] ) ? 1 : 0;
 
@@ -265,17 +264,6 @@ function pmprocc_settings_page() {
 				<hr />
 				<h2><?php esc_html_e( 'Sync Settings', 'pmpro-constant-contact' ); ?></h2>
 				<table class="form-table">
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Remove From List on Cancellation', 'pmpro-constant-contact' ); ?></th>
-						<td>
-							<?php $unsub = ! empty( $options['unsubscribe'] ) ? $options['unsubscribe'] : 'yes'; ?>
-							<select name="pmprocc_options[unsubscribe]">
-								<option value="no" <?php selected( $unsub, 'no' ); ?>><?php esc_html_e( 'No, keep cancelled members on the list', 'pmpro-constant-contact' ); ?></option>
-								<option value="yes" <?php selected( $unsub, 'yes' ); ?>><?php esc_html_e( 'Yes, remove members with no active membership', 'pmpro-constant-contact' ); ?></option>
-							</select>
-							<p class="description"><?php esc_html_e( 'When a member no longer has any membership level, remove them from the member list. Constant Contact bills by active contact count, so removing cancelled members can reduce costs.', 'pmpro-constant-contact' ); ?></p>
-						</td>
-					</tr>
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Remove Tags on Level Change', 'pmpro-constant-contact' ); ?></th>
 						<td>
