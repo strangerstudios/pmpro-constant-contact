@@ -17,7 +17,6 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 = Features =
 
 * **OAuth 2.0 Authentication** — Secure connection using your Constant Contact application's API Key and Secret (PKCE is used automatically for public clients without a secret).
-* **Member List** — All members are added to a single Constant Contact list of your choice.
 * **Tags per Level** — Assign tags for each membership level to segment your members. Only PMPro-controlled tags are modified; manually applied tags are preserved.
 * **Profile Sync** — Optionally sync contact data and tags when a user updates their WordPress profile.
 * **Background Processing** — Uses PMPro Action Scheduler for non-blocking sync operations.
@@ -62,13 +61,6 @@ Level-specific tags are removed (if tag removal is enabled). The contact remains
 Constant Contact tags are account-wide and can be used to filter recipients when sending an email, so a single list plus per-level tags keeps members segmented without maintaining multiple lists. Note: accounts with more than 10,000 contacts cannot filter by tag at send time and must use a custom segment instead (active custom segments are limited on the Lite and Standard plans).
 
 == Changelog ==
-
-= 2.0 - 2026-03-31 =
-* Complete rewrite using Constant Contact v3 API.
-* OAuth 2.0 authentication flow (API Key + Secret, with PKCE support for public clients).
-* Members are added to a single member list with tags assigned per membership level.
-* Background sync via PMPro Action Scheduler.
-* Debug logging.
 
 = 1.0.3 =
 * Legacy version using Constant Contact v2 API (deprecated).
