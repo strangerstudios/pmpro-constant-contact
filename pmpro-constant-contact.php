@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Paid Memberships Pro - Constant Contact Add On
  * Plugin URI: https://www.paidmembershipspro.com/add-ons/pmpro-constant-contact/
- * Description: Sync PMPro members with Constant Contact lists and tags.
+ * Description: Sync PMPro members to a Constant Contact list with tags assigned per membership level.
  * Version: 2.0
  * Author: Paid Memberships Pro
  * Author URI: https://www.paidmembershipspro.com

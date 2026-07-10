@@ -8,18 +8,17 @@ Stable tag: 2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Sync your PMPro members with Constant Contact lists and tags.
+Sync your PMPro members to a Constant Contact list with tags assigned per membership level.
 
 == Description ==
 
-This plugin integrates Paid Memberships Pro with Constant Contact using the v3 API. Automatically add members to Constant Contact lists and apply tags based on their membership level.
+This plugin integrates Paid Memberships Pro with Constant Contact using the v3 API. Members are automatically added to a Constant Contact list of your choice and tagged based on their membership level.
 
 = Features =
 
 * **OAuth 2.0 Authentication** — Secure connection using your Constant Contact application's API Key and Secret (PKCE is used automatically for public clients without a secret).
-* **List Management** — Assign Constant Contact lists to each membership level. Members are automatically added when they gain a level and optionally removed when they lose it.
-* **Tag Management** — Assign tags per membership level. Only PMPro-controlled tags are modified; manually applied tags are preserved.
-* **Non-Member Lists** — Automatically subscribe new users without a membership level to designated lists.
+* **Member List** — All members are added to a single Constant Contact list of your choice, and optionally removed when they no longer have a membership.
+* **Tags per Level** — Assign tags for each membership level to segment your members. Only PMPro-controlled tags are modified; manually applied tags are preserved.
 * **Custom Fields** — Membership level ID and name are stored as custom fields on each contact.
 * **Profile Sync** — Optionally sync contact data and tags when a user updates their WordPress profile.
 * **Background Processing** — Uses PMPro Action Scheduler for non-blocking sync operations.
@@ -37,7 +36,7 @@ This plugin integrates Paid Memberships Pro with Constant Contact using the v3 A
 3. Navigate to Memberships > Constant Contact in your WordPress admin.
 4. Enter your Constant Contact API Key (Client ID) and API Secret from the [Constant Contact Developer Portal](https://app.constantcontact.com/pages/dma/portal/).
 5. Save settings, then click "Connect to Constant Contact" to authorize.
-6. Configure lists and tags for each membership level.
+6. Choose the list that members should be added to and assign tags for each membership level.
 
 == Frequently Asked Questions ==
 
@@ -58,17 +57,20 @@ No. The plugin only manages tags that are mapped to PMPro membership levels. Any
 
 = What happens when a member cancels? =
 
-Depending on your settings, the member can be removed from the lists associated with their old level and have level-specific tags removed. Non-member lists will be applied if configured.
+Level-specific tags are removed (if tag removal is enabled), and depending on your settings the member can also be removed from the member list. Constant Contact bills by active contact count, so removing cancelled members can reduce costs.
+
+= Why one list with tags instead of a list per level? =
+
+Constant Contact tags are account-wide and can be used to filter recipients when sending an email, so a single list plus per-level tags keeps members segmented without maintaining multiple lists. Note: accounts with more than 10,000 contacts cannot filter by tag at send time and must use a custom segment instead (active custom segments are limited on the Lite and Standard plans).
 
 == Changelog ==
 
 = 2.0 - 2026-03-31 =
 * Complete rewrite using Constant Contact v3 API.
 * OAuth 2.0 authentication flow (API Key + Secret, with PKCE support for public clients).
-* List and tag assignment per membership level.
+* Members are added to a single member list with tags assigned per membership level.
 * Custom fields for membership level data.
 * Background sync via PMPro Action Scheduler.
-* Non-member list support.
 * Debug logging.
 
 = 1.0.3 =

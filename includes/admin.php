@@ -62,17 +62,15 @@ function pmprocc_options_validate( $input ) {
 	$output['background_sync']     = ! empty( $input['background_sync'] ) ? 1 : 0;
 	$output['logging_enabled']     = ! empty( $input['logging_enabled'] ) ? 1 : 0;
 
-	// Non-member lists.
-	$output['users_lists'] = ! empty( $input['users_lists'] ) ? array_map( 'sanitize_text_field', $input['users_lists'] ) : array();
+	// Member list.
+	$output['master_list'] = ! empty( $input['master_list'] ) ? sanitize_text_field( $input['master_list'] ) : '';
 
-	// Per-level lists and tags.
+	// Per-level tags.
 	$levels = pmpro_getAllLevels( true, true );
 	foreach ( $levels as $level ) {
-		$list_key = 'level_' . $level->id . '_lists';
-		$tag_key  = 'level_' . $level->id . '_tags';
+		$tag_key = 'level_' . $level->id . '_tags';
 
-		$output[ $list_key ] = ! empty( $input[ $list_key ] ) ? array_map( 'sanitize_text_field', $input[ $list_key ] ) : array();
-		$output[ $tag_key ]  = ! empty( $input[ $tag_key ] ) ? array_map( 'sanitize_text_field', $input[ $tag_key ] ) : array();
+		$output[ $tag_key ] = ! empty( $input[ $tag_key ] ) ? array_map( 'sanitize_text_field', $input[ $tag_key ] ) : array();
 	}
 
 	return $output;
@@ -229,38 +227,36 @@ function pmprocc_settings_page() {
 
 				<?php if ( ! empty( $levels ) ) : ?>
 
-					<h3><?php esc_html_e( 'Non-Member Lists', 'pmpro-constant-contact' ); ?></h3>
-					<p class="description"><?php esc_html_e( 'Users without a membership level will be added to these lists.', 'pmpro-constant-contact' ); ?></p>
+					<h3><?php esc_html_e( 'Member List', 'pmpro-constant-contact' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'All members are added to this list. Use the tags below to segment members by level.', 'pmpro-constant-contact' ); ?></p>
 					<table class="form-table">
 						<tr>
-							<th scope="row"><?php esc_html_e( 'Lists', 'pmpro-constant-contact' ); ?></th>
+							<th scope="row">
+								<label for="pmprocc_master_list"><?php esc_html_e( 'List', 'pmpro-constant-contact' ); ?></label>
+							</th>
 							<td>
-								<?php
-								$selected = ! empty( $options['users_lists'] ) ? $options['users_lists'] : array();
-								pmprocc_render_checkbox_list( 'pmprocc_options[users_lists][]', $lists, $selected, 'list_id' );
-								?>
+								<select id="pmprocc_master_list" name="pmprocc_options[master_list]">
+									<option value=""><?php esc_html_e( '— Select a list —', 'pmpro-constant-contact' ); ?></option>
+									<?php foreach ( $lists as $list ) : ?>
+										<option value="<?php echo esc_attr( $list['list_id'] ); ?>" <?php selected( ! empty( $options['master_list'] ) ? $options['master_list'] : '', $list['list_id'] ); ?>>
+											<?php echo esc_html( $list['name'] ); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+								<?php if ( empty( $options['master_list'] ) ) : ?>
+									<p class="description"><strong><?php esc_html_e( 'Syncing is disabled until a list is selected.', 'pmpro-constant-contact' ); ?></strong></p>
+								<?php endif; ?>
 							</td>
 						</tr>
 					</table>
 
-					<h3><?php esc_html_e( 'Membership Level Settings', 'pmpro-constant-contact' ); ?></h3>
-					<p class="description"><?php esc_html_e( 'Assign lists and tags for each membership level. Members will be added to the selected lists and tagged when they have the corresponding level.', 'pmpro-constant-contact' ); ?></p>
+					<h3><?php esc_html_e( 'Membership Level Tags', 'pmpro-constant-contact' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Assign tags for each membership level. Members are tagged when they have the corresponding level.', 'pmpro-constant-contact' ); ?></p>
 
-					<?php foreach ( $levels as $level ) : ?>
-						<h4><?php echo esc_html( $level->name ); ?></h4>
-						<table class="form-table">
+					<table class="form-table">
+						<?php foreach ( $levels as $level ) : ?>
 							<tr>
-								<th scope="row"><?php esc_html_e( 'Lists', 'pmpro-constant-contact' ); ?></th>
-								<td>
-									<?php
-									$key      = 'level_' . $level->id . '_lists';
-									$selected = ! empty( $options[ $key ] ) ? $options[ $key ] : array();
-									pmprocc_render_checkbox_list( "pmprocc_options[{$key}][]", $lists, $selected, 'list_id' );
-									?>
-								</td>
-							</tr>
-							<tr>
-								<th scope="row"><?php esc_html_e( 'Tags', 'pmpro-constant-contact' ); ?></th>
+								<th scope="row"><?php echo esc_html( $level->name ); ?></th>
 								<td>
 									<?php
 									$key      = 'level_' . $level->id . '_tags';
@@ -269,8 +265,8 @@ function pmprocc_settings_page() {
 									?>
 								</td>
 							</tr>
-						</table>
-					<?php endforeach; ?>
+						<?php endforeach; ?>
+					</table>
 
 				<?php else : ?>
 					<p><?php esc_html_e( 'No membership levels found. Create membership levels in PMPro first.', 'pmpro-constant-contact' ); ?></p>
@@ -280,14 +276,14 @@ function pmprocc_settings_page() {
 				<h2><?php esc_html_e( 'Sync Settings', 'pmpro-constant-contact' ); ?></h2>
 				<table class="form-table">
 					<tr>
-						<th scope="row"><?php esc_html_e( 'Unsubscribe on Level Change', 'pmpro-constant-contact' ); ?></th>
+						<th scope="row"><?php esc_html_e( 'Remove From List on Cancellation', 'pmpro-constant-contact' ); ?></th>
 						<td>
 							<?php $unsub = ! empty( $options['unsubscribe'] ) ? $options['unsubscribe'] : 'yes'; ?>
 							<select name="pmprocc_options[unsubscribe]">
-								<option value="no" <?php selected( $unsub, 'no' ); ?>><?php esc_html_e( 'No', 'pmpro-constant-contact' ); ?></option>
-								<option value="yes" <?php selected( $unsub, 'yes' ); ?>><?php esc_html_e( 'Yes (remove from old level lists)', 'pmpro-constant-contact' ); ?></option>
+								<option value="no" <?php selected( $unsub, 'no' ); ?>><?php esc_html_e( 'No, keep cancelled members on the list', 'pmpro-constant-contact' ); ?></option>
+								<option value="yes" <?php selected( $unsub, 'yes' ); ?>><?php esc_html_e( 'Yes, remove members with no active membership', 'pmpro-constant-contact' ); ?></option>
 							</select>
-							<p class="description"><?php esc_html_e( 'When a member changes or loses a level, remove them from lists they no longer qualify for.', 'pmpro-constant-contact' ); ?></p>
+							<p class="description"><?php esc_html_e( 'When a member no longer has any membership level, remove them from the member list. Constant Contact bills by active contact count, so removing cancelled members can reduce costs.', 'pmpro-constant-contact' ); ?></p>
 						</td>
 					</tr>
 					<tr>

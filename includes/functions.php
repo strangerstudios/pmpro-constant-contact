@@ -117,8 +117,9 @@ add_action( 'init', 'pmprocc_register_action_scheduler' );
 /**
  * Sync a single user to Constant Contact.
  *
- * Creates or updates the contact, manages list memberships
- * based on membership levels, and optionally manages tags.
+ * Adds members to the configured list, keeps their level custom fields
+ * up to date, and optionally manages tags. When a user has no remaining
+ * membership levels, they are optionally removed from the list.
  *
  * @param int  $user_id     WordPress user ID.
  * @param bool $update_tags Whether to sync tags.
@@ -134,7 +135,15 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 		return;
 	}
 
-	$options = get_option( 'pmprocc_options', array() );
+	$options     = get_option( 'pmprocc_options', array() );
+	$master_list = ! empty( $options['master_list'] ) ? $options['master_list'] : '';
+
+	// Contacts can only be created/updated through a list, so nothing can sync
+	// until a list is selected on the settings page.
+	if ( empty( $master_list ) ) {
+		pmprocc_log( "No list selected in settings; skipping sync for user {$user_id}." );
+		return;
+	}
 
 	// Get the user's current membership levels.
 	$levels    = pmpro_getMembershipLevelsForUser( $user_id );
@@ -142,33 +151,14 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 
 	pmprocc_log( "Syncing user {$user_id} (" . pmprocc_mask_email( $user->user_email ) . '), levels: ' . implode( ',', $level_ids ) );
 
-	// Short-circuit: nothing to sync for a user with no levels, no stored
-	// contact, and no non-member lists configured. Mirrors pmpro-kit's
-	// "no levels and no subscriber ID" bail to avoid needless remote calls.
+	// Nothing to sync for a user with no levels and no stored contact.
+	// Mirrors pmpro-kit's "no levels and no subscriber ID" bail to avoid
+	// needless remote calls.
 	$stored_contact_id = get_user_meta( $user_id, 'pmprocc_contact_id', true );
-	if ( empty( $level_ids ) && empty( $stored_contact_id ) && empty( $options['users_lists'] ) ) {
-		pmprocc_log( "Nothing to sync for user {$user_id} (no levels, no stored contact, no non-member lists)." );
+	if ( empty( $level_ids ) && empty( $stored_contact_id ) ) {
+		pmprocc_log( "Nothing to sync for user {$user_id} (no levels, no stored contact)." );
 		return;
 	}
-
-	// ------------------------------------------------------------------
-	// Build list membership array.
-	// ------------------------------------------------------------------
-	$subscribe_lists = array();
-
-	// Lists for current levels.
-	foreach ( $level_ids as $lid ) {
-		$level_lists = ! empty( $options[ 'level_' . $lid . '_lists' ] ) ? $options[ 'level_' . $lid . '_lists' ] : array();
-		$subscribe_lists = array_merge( $subscribe_lists, $level_lists );
-	}
-
-	// If no membership, add to non-member lists.
-	if ( empty( $level_ids ) ) {
-		$nonmember_lists = ! empty( $options['users_lists'] ) ? $options['users_lists'] : array();
-		$subscribe_lists = array_merge( $subscribe_lists, $nonmember_lists );
-	}
-
-	$subscribe_lists = array_unique( array_filter( $subscribe_lists ) );
 
 	// ------------------------------------------------------------------
 	// Build custom fields.
@@ -181,20 +171,23 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 		$field_map = $api->ensure_custom_fields();
 	}
 
+	// Note: the sign_up_form endpoint ignores blank custom field values, so
+	// these cannot be cleared through it. For a contact kept on the list after
+	// cancellation, the fields retain the most recent membership; use tags to
+	// segment by active membership.
 	$custom_fields = array();
 
-	if ( ! empty( $field_map['pmpro_level_id'] ) ) {
+	if ( ! empty( $field_map['pmpro_level_id'] ) && ! empty( $level_ids ) ) {
 		$custom_fields[] = array(
 			'custom_field_id' => $field_map['pmpro_level_id'],
-			'value'           => ! empty( $level_ids ) ? implode( ',', $level_ids ) : '',
+			'value'           => implode( ',', $level_ids ),
 		);
 	}
 
-	if ( ! empty( $field_map['pmpro_level_name'] ) ) {
-		$level_names = wp_list_pluck( $levels, 'name' );
+	if ( ! empty( $field_map['pmpro_level_name'] ) && ! empty( $levels ) ) {
 		$custom_fields[] = array(
 			'custom_field_id' => $field_map['pmpro_level_name'],
-			'value'           => ! empty( $level_names ) ? implode( ', ', $level_names ) : '',
+			'value'           => implode( ', ', wp_list_pluck( $levels, 'name' ) ),
 		);
 	}
 
@@ -208,36 +201,38 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 	$custom_fields = apply_filters( 'pmprocc_custom_fields', $custom_fields, $user, $levels );
 
 	// ------------------------------------------------------------------
-	// Upsert the contact.
+	// Upsert the contact, or remove a cancelled member from the list.
 	// ------------------------------------------------------------------
-	$contact_data = array(
-		'email_address'    => $user->user_email,
-		'create_source'    => 'Account',
-		'list_memberships' => array_values( $subscribe_lists ),
-	);
+	$remove_from_list = empty( $level_ids ) && ( empty( $options['unsubscribe'] ) || 'no' !== $options['unsubscribe'] );
 
-	// The sign_up_form endpoint rejects empty name fields.
-	if ( '' !== $user->first_name ) {
-		$contact_data['first_name'] = $user->first_name;
-	}
-	if ( '' !== $user->last_name ) {
-		$contact_data['last_name'] = $user->last_name;
-	}
+	if ( ! $remove_from_list ) {
+		$contact_data = array(
+			'email_address'    => $user->user_email,
+			'create_source'    => 'Account',
+			'list_memberships' => array( $master_list ),
+		);
 
-	if ( ! empty( $custom_fields ) ) {
-		$contact_data['custom_fields'] = $custom_fields;
-	}
+		// The sign_up_form endpoint rejects empty name fields.
+		if ( '' !== $user->first_name ) {
+			$contact_data['first_name'] = $user->first_name;
+		}
+		if ( '' !== $user->last_name ) {
+			$contact_data['last_name'] = $user->last_name;
+		}
 
-	/**
-	 * Filter contact data before sending to Constant Contact.
-	 *
-	 * @param array   $contact_data Contact data for the upsert.
-	 * @param WP_User $user         The WordPress user.
-	 * @param array   $levels       The user's membership levels.
-	 */
-	$contact_data = apply_filters( 'pmprocc_contact_data', $contact_data, $user, $levels );
+		if ( ! empty( $custom_fields ) ) {
+			$contact_data['custom_fields'] = $custom_fields;
+		}
 
-	if ( ! empty( $contact_data['list_memberships'] ) ) {
+		/**
+		 * Filter contact data before sending to Constant Contact.
+		 *
+		 * @param array   $contact_data Contact data for the upsert.
+		 * @param WP_User $user         The WordPress user.
+		 * @param array   $levels       The user's membership levels.
+		 */
+		$contact_data = apply_filters( 'pmprocc_contact_data', $contact_data, $user, $levels );
+
 		$result = $api->upsert_contact( $contact_data );
 
 		if ( is_wp_error( $result ) ) {
@@ -252,30 +247,23 @@ function pmprocc_sync_contact_for_user( $user_id, $update_tags = true ) {
 
 		pmprocc_log( "Upserted contact {$contact_id} for user {$user_id}" );
 	} else {
-		// The sign_up_form endpoint requires at least one list, so we can't upsert.
-		// Resolve the existing contact so the list removals and tag changes below
-		// still run (e.g. a member cancels and no non-member lists are configured).
-		// Prefer the stored contact ID and only fall back to a remote email lookup,
-		// matching pmpro-kit's stored-ID-first convention.
-		$contact_id = get_user_meta( $user_id, 'pmprocc_contact_id', true );
+		// The user has no membership levels and "remove from list on cancel" is
+		// enabled, so don't upsert (that would re-add them). Resolve the existing
+		// contact so the list and tag removals below still run. Prefer the stored
+		// contact ID, falling back to a remote email lookup.
+		$contact_id = $stored_contact_id;
 		if ( empty( $contact_id ) ) {
 			$contact    = $api->get_contact_by_email( $user->user_email );
 			$contact_id = ! empty( $contact['contact_id'] ) ? $contact['contact_id'] : '';
 		}
-		pmprocc_log( "No lists apply to user {$user_id}; skipped upsert. Existing contact: " . ( $contact_id ? $contact_id : 'none' ) );
-	}
 
-	// ------------------------------------------------------------------
-	// Handle unsubscription from old level lists.
-	// ------------------------------------------------------------------
-	if ( ! empty( $options['unsubscribe'] ) && 'no' !== $options['unsubscribe'] && $contact_id ) {
-		$all_configured_lists = pmprocc_get_all_configured_lists();
-		$lists_to_remove      = array_diff( $all_configured_lists, $subscribe_lists );
-
-		if ( ! empty( $lists_to_remove ) ) {
-			$api->remove_contacts_from_lists( array( $contact_id ), array_values( $lists_to_remove ) );
-			pmprocc_log( "Removed contact {$contact_id} from lists: " . implode( ',', $lists_to_remove ) );
+		if ( empty( $contact_id ) ) {
+			pmprocc_log( "No existing contact found for user {$user_id}; nothing to remove." );
+			return;
 		}
+
+		$api->remove_contacts_from_lists( array( $contact_id ), array( $master_list ) );
+		pmprocc_log( "Removed contact {$contact_id} from list {$master_list} (membership cancelled)." );
 	}
 
 	// ------------------------------------------------------------------
@@ -363,32 +351,6 @@ function pmprocc_sync_tags_for_contact( $user_id, $contact_id, $level_ids ) {
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
-
-/**
- * Get all list IDs configured across all levels + non-member lists.
- *
- * @return array
- */
-function pmprocc_get_all_configured_lists() {
-	$options   = get_option( 'pmprocc_options', array() );
-	$all_lists = array();
-
-	// Non-member lists.
-	if ( ! empty( $options['users_lists'] ) ) {
-		$all_lists = array_merge( $all_lists, $options['users_lists'] );
-	}
-
-	// Level-specific lists.
-	$levels = pmpro_getAllLevels( true, true );
-	foreach ( $levels as $level ) {
-		$key = 'level_' . $level->id . '_lists';
-		if ( ! empty( $options[ $key ] ) ) {
-			$all_lists = array_merge( $all_lists, $options[ $key ] );
-		}
-	}
-
-	return array_unique( array_filter( $all_lists ) );
-}
 
 /**
  * Get all tag IDs configured across all levels.
@@ -596,27 +558,3 @@ function pmprocc_admin_member_edit() {
 	pmprocc_enqueue_sync_for_user( $user_id, 'yes' === $sync_profile_update );
 }
 add_action( 'admin_init', 'pmprocc_admin_member_edit', 20 );
-
-/**
- * Subscribe new non-member users to non-member lists.
- *
- * @param int $user_id New user ID.
- */
-function pmprocc_user_register( $user_id ) {
-	$options = get_option( 'pmprocc_options', array() );
-
-	// Don't sync during checkout — at checkout the new user is created via
-	// wp_insert_user() (firing user_register) BEFORE the membership level is
-	// set, so pmpro_after_all_membership_level_changes will handle the sync.
-	// Syncing here would place the new member on the non-member lists first.
-	if ( function_exists( 'pmpro_was_checkout_form_submitted' ) && pmpro_was_checkout_form_submitted() ) {
-		return;
-	}
-
-	if ( empty( $options['users_lists'] ) ) {
-		return;
-	}
-
-	pmprocc_enqueue_sync_for_user( $user_id, false );
-}
-add_action( 'user_register', 'pmprocc_user_register' );
