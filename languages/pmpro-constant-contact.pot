@@ -1,0 +1,276 @@
+# Copyright (C) 2026 Paid Memberships Pro
+# This file is distributed under the GPL-2.0+.
+msgid ""
+msgstr ""
+"Project-Id-Version: Paid Memberships Pro - Constant Contact Add On 2.0\n"
+"Report-Msgid-Bugs-To: info@paidmembershipspro.com\n"
+"Last-Translator: Paid Memberships Pro <info@paidmembershipspro.com>\n"
+"Language-Team: Paid Memberships Pro <info@paidmembershipspro.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-07-10T18:51:16+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: pmpro-constant-contact\n"
+
+#. Plugin Name of the plugin
+#: pmpro-constant-contact.php
+msgid "Paid Memberships Pro - Constant Contact Add On"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: pmpro-constant-contact.php
+msgid "https://www.paidmembershipspro.com/add-ons/pmpro-constant-contact/"
+msgstr ""
+
+#. Description of the plugin
+#: pmpro-constant-contact.php
+msgid "Sync PMPro members to a Constant Contact list with tags assigned per membership level."
+msgstr ""
+
+#. Author of the plugin
+#: pmpro-constant-contact.php
+msgid "Paid Memberships Pro"
+msgstr ""
+
+#. Author URI of the plugin
+#: pmpro-constant-contact.php
+msgid "https://www.paidmembershipspro.com"
+msgstr ""
+
+#: classes/class-pmpro-constant-contact-api.php:337
+msgid "Not connected to Constant Contact."
+msgstr ""
+
+#: classes/class-pmpro-constant-contact-api.php:474
+msgid "Unknown error."
+msgstr ""
+
+#: includes/admin.php:16
+msgid "PMPro Constant Contact"
+msgstr ""
+
+#: includes/admin.php:17
+msgid "Constant Contact"
+msgstr ""
+
+#: includes/admin.php:140
+msgid "Constant Contact Integration"
+msgstr ""
+
+#: includes/admin.php:147
+msgid "Authentication"
+msgstr ""
+
+#: includes/admin.php:152
+msgid "API Key (Client ID)"
+msgstr ""
+
+#. translators: %s: Constant Contact developer portal URL
+#: includes/admin.php:162
+#, php-format
+msgid "Create an application at %s to get your API Key."
+msgstr ""
+
+#. translators: %s: OAuth redirect URI
+#: includes/admin.php:171
+#, php-format
+msgid "Set your application's Redirect URI to: %s"
+msgstr ""
+
+#: includes/admin.php:180
+msgid "API Secret"
+msgstr ""
+
+#: includes/admin.php:187
+msgid "The client secret generated for your application. Constant Contact only shows this once when the app is created. Leave blank only if your application was created as a public (PKCE) client without a secret."
+msgstr ""
+
+#: includes/admin.php:193
+msgid "Connection Status"
+msgstr ""
+
+#: includes/admin.php:197
+msgid "Connected to Constant Contact"
+msgstr ""
+
+#: includes/admin.php:207
+msgid "Disconnect"
+msgstr ""
+
+#: includes/admin.php:211
+msgid "Not connected"
+msgstr ""
+
+#: includes/admin.php:219
+msgid "Connect to Constant Contact"
+msgstr ""
+
+#: includes/admin.php:223
+msgid "Enter your API Key and Secret, then save to connect."
+msgstr ""
+
+#: includes/admin.php:230
+msgid "Member List"
+msgstr ""
+
+#: includes/admin.php:234
+msgid "— Select a list —"
+msgstr ""
+
+#: includes/admin.php:241
+msgid "All members are added to this list. Use the tags below to segment members by level."
+msgstr ""
+
+#: includes/admin.php:243
+msgid "Syncing is disabled until a list is selected."
+msgstr ""
+
+#: includes/admin.php:256
+msgid "Membership Level Tags"
+msgstr ""
+
+#: includes/admin.php:258
+msgid "Refresh Lists & Tags"
+msgstr ""
+
+#: includes/admin.php:264
+msgid "Error fetching lists from Constant Contact."
+msgstr ""
+
+#: includes/admin.php:269
+msgid "Error fetching tags from Constant Contact."
+msgstr ""
+
+#: includes/admin.php:276
+msgid "Assign tags for each membership level. Members are tagged when they have the corresponding level."
+msgstr ""
+
+#: includes/admin.php:277
+msgid "Create and manage tags in Constant Contact."
+msgstr ""
+
+#: includes/admin.php:296
+msgid "No membership levels found. Create membership levels in PMPro first."
+msgstr ""
+
+#: includes/admin.php:300
+msgid "Sync Settings"
+msgstr ""
+
+#: includes/admin.php:303
+msgid "Remove Tags on Level Change"
+msgstr ""
+
+#: includes/admin.php:308
+msgid "Remove tags from contacts when they lose or change a membership level."
+msgstr ""
+
+#: includes/admin.php:310
+msgid "Only tags mapped to PMPro levels above are affected. Manually applied tags are never removed."
+msgstr ""
+
+#: includes/admin.php:314
+msgid "Sync on Profile Update"
+msgstr ""
+
+#: includes/admin.php:318
+msgid "No"
+msgstr ""
+
+#: includes/admin.php:319
+msgid "Yes (contact data only)"
+msgstr ""
+
+#: includes/admin.php:320
+msgid "Yes (contact data + tags)"
+msgstr ""
+
+#: includes/admin.php:322
+msgid "Sync contact data to Constant Contact when a user updates their WordPress profile."
+msgstr ""
+
+#: includes/admin.php:326
+msgid "Process in Background"
+msgstr ""
+
+#: includes/admin.php:331
+msgid "Use Action Scheduler for background processing (recommended)."
+msgstr ""
+
+#: includes/admin.php:336
+msgid "Debug Logging"
+msgstr ""
+
+#: includes/admin.php:341
+msgid "Enable debug logging for API calls and sync events."
+msgstr ""
+
+#. translators: %s: Log file size
+#: includes/admin.php:351
+#, php-format
+msgid "Log file size: %s"
+msgstr ""
+
+#: includes/admin.php:361
+msgid "Download log."
+msgstr ""
+
+#: includes/admin.php:387
+msgid "No tags found."
+msgstr ""
+
+#: includes/admin.php:387
+msgid "Create tags in Constant Contact"
+msgstr ""
+
+#: includes/admin.php:387
+msgid "then refresh."
+msgstr ""
+
+#: includes/admin.php:412
+msgid "Settings saved."
+msgstr ""
+
+#: includes/admin.php:416
+msgid "Successfully connected to Constant Contact!"
+msgstr ""
+
+#: includes/admin.php:420
+msgid "Disconnected from Constant Contact."
+msgstr ""
+
+#: includes/admin.php:426
+msgid "Authorization was denied. Please try again."
+msgstr ""
+
+#: includes/admin.php:427
+msgid "Security validation failed. Please try connecting again."
+msgstr ""
+
+#: includes/admin.php:428
+msgid "Authorization session expired. Please try connecting again."
+msgstr ""
+
+#: includes/admin.php:429
+msgid "Failed to complete authorization. Check your API Key and API Secret and try again."
+msgstr ""
+
+#: includes/admin.php:431
+msgid "An error occurred. Please try again."
+msgstr ""
+
+#. translators: %s: OAuth error message returned by Constant Contact
+#: includes/admin.php:440
+#, php-format
+msgid "Constant Contact said: %s"
+msgstr ""
+
+#: pmpro-constant-contact.php:75
+msgid "Settings"
+msgstr ""
+
+#: pmpro-constant-contact.php:102
+msgid "Paid Memberships Pro - Constant Contact Add On requires Paid Memberships Pro to be installed and active."
+msgstr ""
