@@ -262,8 +262,13 @@ function pmprocc_sync_tags_for_contact( $user_id, $contact_id, $level_ids ) {
 	// Get the contact's current tags. The upsert (sign_up_form) response does not
 	// return taggings, but the contact_id is already known, so fetch the contact
 	// directly with include=taggings rather than doing a separate email lookup.
-	$contact      = $api->get_contact( $contact_id, 'taggings' );
-	$current_tags = ( ! is_wp_error( $contact ) && ! empty( $contact['taggings'] ) ) ? $contact['taggings'] : array();
+	$contact = $api->get_contact( $contact_id, 'taggings' );
+	if ( is_wp_error( $contact ) ) {
+		pmprocc_log( "Failed to retrieve tags for contact {$contact_id}: " . $contact->get_error_message() );
+		return;
+	}
+
+	$current_tags = ! empty( $contact['taggings'] ) ? $contact['taggings'] : array();
 
 	// Only look at controlled tags.
 	$current_controlled = array_intersect( $current_tags, $controlled_tags );
@@ -271,16 +276,24 @@ function pmprocc_sync_tags_for_contact( $user_id, $contact_id, $level_ids ) {
 	// Tags to add.
 	$tags_to_add = array_diff( $required_tags, $current_controlled );
 	if ( ! empty( $tags_to_add ) ) {
-		$api->add_tags_to_contacts( array( $contact_id ), array_values( $tags_to_add ) );
-		pmprocc_log( "Added tags to contact {$contact_id}: " . implode( ',', $tags_to_add ) );
+		$result = $api->add_tags_to_contacts( array( $contact_id ), array_values( $tags_to_add ) );
+		if ( is_wp_error( $result ) ) {
+			pmprocc_log( "Failed to queue tag additions for contact {$contact_id}: " . $result->get_error_message() );
+		} else {
+			pmprocc_log( "Queued tags to add to contact {$contact_id}: " . implode( ',', $tags_to_add ) );
+		}
 	}
 
 	// Tags to remove.
 	if ( ! empty( $options['remove_tags'] ) ) {
 		$tags_to_remove = array_diff( $current_controlled, $required_tags );
 		if ( ! empty( $tags_to_remove ) ) {
-			$api->remove_tags_from_contacts( array( $contact_id ), array_values( $tags_to_remove ) );
-			pmprocc_log( "Removed tags from contact {$contact_id}: " . implode( ',', $tags_to_remove ) );
+			$result = $api->remove_tags_from_contacts( array( $contact_id ), array_values( $tags_to_remove ) );
+			if ( is_wp_error( $result ) ) {
+				pmprocc_log( "Failed to queue tag removals for contact {$contact_id}: " . $result->get_error_message() );
+			} else {
+				pmprocc_log( "Queued tags to remove from contact {$contact_id}: " . implode( ',', $tags_to_remove ) );
+			}
 		}
 	}
 }
