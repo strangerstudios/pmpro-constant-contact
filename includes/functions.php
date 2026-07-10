@@ -273,8 +273,9 @@ function pmprocc_sync_tags_for_contact( $user_id, $contact_id, $level_ids ) {
 	// Only look at controlled tags.
 	$current_controlled = array_intersect( $current_tags, $controlled_tags );
 
-	// Tags to add.
-	$tags_to_add = array_diff( $required_tags, $current_controlled );
+	// Tags to add. Diff against all current tags (not just the controlled set) so
+	// filter-added tags the contact already has aren't re-queued on every sync.
+	$tags_to_add = array_diff( $required_tags, $current_tags );
 	if ( ! empty( $tags_to_add ) ) {
 		$result = $api->add_tags_to_contacts( array( $contact_id ), array_values( $tags_to_add ) );
 		if ( is_wp_error( $result ) ) {
@@ -360,7 +361,12 @@ function pmprocc_profile_update( $user_id, $old_user_data = null ) {
 	if ( $old_user_data && isset( $old_user_data->user_email ) ) {
 		$new_user_data = get_userdata( $user_id );
 		if ( $new_user_data && $new_user_data->user_email !== $old_user_data->user_email ) {
-			pmprocc_handle_email_change( $user_id, $old_user_data->user_email, $new_user_data->user_email );
+			$reconciled = pmprocc_handle_email_change( $user_id, $old_user_data->user_email, $new_user_data->user_email );
+			if ( ! $reconciled ) {
+				// An existing contact is still keyed to the old email; syncing now
+				// would create a duplicate contact under the new address.
+				return;
+			}
 		}
 	}
 
@@ -380,11 +386,13 @@ add_action( 'profile_update', 'pmprocc_profile_update', 10, 2 );
  * @param int    $user_id   WordPress user ID.
  * @param string $old_email The user's previous email address.
  * @param string $new_email The user's new email address.
+ * @return bool False only when an existing contact could not be reconciled
+ *              (so a follow-up sync by the new email would create a duplicate).
  */
 function pmprocc_handle_email_change( $user_id, $old_email, $new_email ) {
 	$api = PMPro_Constant_Contact_API::get_instance();
 	if ( ! $api->is_connected() ) {
-		return;
+		return true;
 	}
 
 	// Find the existing contact. Prefer the stored ID, but fall back to a lookup
@@ -409,7 +417,8 @@ function pmprocc_handle_email_change( $user_id, $old_email, $new_email ) {
 
 	if ( empty( $contact_id ) || empty( $contact ) ) {
 		pmprocc_log( "Email change for user {$user_id}: no existing contact found for " . pmprocc_mask_email( $old_email ) . '.' );
-		return;
+		// Nothing to reconcile — a sync by the new email is safe.
+		return true;
 	}
 
 	// The v3 Contacts API has no PATCH; a single contact is updated with a
@@ -449,17 +458,18 @@ function pmprocc_handle_email_change( $user_id, $old_email, $new_email ) {
 	// reconciled this way, so skip the PUT rather than silently failing on a 400.
 	if ( empty( $put_data['list_memberships'] ) ) {
 		pmprocc_log( "Email change for user {$user_id}: contact {$contact_id} has no list memberships; cannot reconcile email from " . pmprocc_mask_email( $old_email ) . ' to ' . pmprocc_mask_email( $new_email ) . ' via PUT.' );
-		return;
+		return false;
 	}
 
 	$result = $api->update_contact( $contact_id, $put_data );
 
 	if ( is_wp_error( $result ) ) {
 		pmprocc_log( "Failed to update email for contact {$contact_id} (user {$user_id}): " . $result->get_error_message() );
-		return;
+		return false;
 	}
 
 	pmprocc_log( "Updated contact {$contact_id} email from " . pmprocc_mask_email( $old_email ) . ' to ' . pmprocc_mask_email( $new_email ) . '.' );
+	return true;
 }
 
 /**

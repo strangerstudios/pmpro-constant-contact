@@ -47,8 +47,9 @@ function pmprocc_handle_oauth_callback() {
 	$code  = sanitize_text_field( wp_unslash( $_GET['code'] ) );
 	$state = sanitize_text_field( wp_unslash( $_GET['state'] ) );
 
-	// Validate state parameter.
-	$stored_state = get_transient( 'pmprocc_oauth_state' );
+	// Validate state parameter. Transients are keyed per user (see
+	// get_authorization_url()) so concurrent admins don't clobber each other.
+	$stored_state = get_transient( 'pmprocc_oauth_state_' . get_current_user_id() );
 	if ( empty( $stored_state ) || ! hash_equals( $stored_state, $state ) ) {
 		pmprocc_log( 'OAuth state mismatch.' );
 		wp_safe_redirect( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_error=state_mismatch' ) );
@@ -56,7 +57,7 @@ function pmprocc_handle_oauth_callback() {
 	}
 
 	// Get the stored PKCE verifier.
-	$verifier = get_transient( 'pmprocc_oauth_verifier' );
+	$verifier = get_transient( 'pmprocc_oauth_verifier_' . get_current_user_id() );
 	if ( empty( $verifier ) ) {
 		pmprocc_log( 'OAuth PKCE verifier expired.' );
 		wp_safe_redirect( admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_error=verifier_expired' ) );
@@ -64,8 +65,8 @@ function pmprocc_handle_oauth_callback() {
 	}
 
 	// Clean up transients.
-	delete_transient( 'pmprocc_oauth_state' );
-	delete_transient( 'pmprocc_oauth_verifier' );
+	delete_transient( 'pmprocc_oauth_state_' . get_current_user_id() );
+	delete_transient( 'pmprocc_oauth_verifier_' . get_current_user_id() );
 
 	// Exchange code for tokens.
 	$api     = PMPro_Constant_Contact_API::get_instance();

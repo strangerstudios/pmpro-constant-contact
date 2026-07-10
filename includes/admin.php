@@ -55,10 +55,10 @@ function pmprocc_options_validate( $input ) {
 	$old_api_secret = isset( $output['api_secret'] ) ? $output['api_secret'] : '';
 
 	if ( array_key_exists( 'api_key', $input ) ) {
-		$output['api_key'] = ! empty( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
+		$output['api_key'] = is_string( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '';
 	}
 	if ( array_key_exists( 'api_secret', $input ) ) {
-		$output['api_secret'] = ! empty( $input['api_secret'] ) ? sanitize_text_field( $input['api_secret'] ) : '';
+		$output['api_secret'] = is_string( $input['api_secret'] ) ? sanitize_text_field( $input['api_secret'] ) : '';
 	}
 
 	$new_api_key    = isset( $output['api_key'] ) ? $output['api_key'] : '';
@@ -85,11 +85,21 @@ function pmprocc_options_validate( $input ) {
 	$output['master_list'] = ! empty( $input['master_list'] ) ? sanitize_text_field( $input['master_list'] ) : '';
 
 	// Per-level tags.
-	$levels = pmpro_getAllLevels( true, true );
+	$levels    = pmpro_getAllLevels( true, true );
+	$level_ids = array();
 	foreach ( $levels as $level ) {
-		$tag_key = 'level_' . $level->id . '_tags';
+		$level_ids[] = intval( $level->id );
+		$tag_key     = 'level_' . $level->id . '_tags';
 
-		$output[ $tag_key ] = ! empty( $input[ $tag_key ] ) ? array_map( 'sanitize_text_field', $input[ $tag_key ] ) : array();
+		$output[ $tag_key ] = ! empty( $input[ $tag_key ] ) ? array_map( 'sanitize_text_field', array_filter( (array) $input[ $tag_key ], 'is_string' ) ) : array();
+	}
+
+	// Prune tag mappings for levels that no longer exist so their tags don't
+	// linger in the option (and out of the controlled set) forever.
+	foreach ( array_keys( $output ) as $key ) {
+		if ( preg_match( '/^level_(\d+)_tags$/', $key, $matches ) && ! in_array( intval( $matches[1] ), $level_ids, true ) ) {
+			unset( $output[ $key ] );
+		}
 	}
 
 	return $output;

@@ -59,7 +59,9 @@ function pmprocc_activation() {
 		$existing = array();
 	}
 
-	update_option( 'pmprocc_options', array_merge( $defaults, $existing ) );
+	// Not autoloaded: the option holds API credentials and is only needed on
+	// sync events and the settings page, not on every request.
+	update_option( 'pmprocc_options', array_merge( $defaults, $existing ), false );
 }
 register_activation_hook( __FILE__, 'pmprocc_activation' );
 
@@ -92,7 +94,7 @@ add_action( 'admin_enqueue_scripts', 'pmprocc_admin_enqueue_scripts' );
  * Show admin notice if PMPro is not active.
  */
 function pmprocc_admin_notice_no_pmpro() {
-	if ( defined( 'PMPRO_VERSION' ) ) {
+	if ( defined( 'PMPRO_VERSION' ) || ! current_user_can( 'activate_plugins' ) ) {
 		return;
 	}
 	?>

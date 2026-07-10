@@ -88,9 +88,13 @@ class PMPro_Constant_Contact_API {
 		if ( ! empty( $tokens['access_token'] ) ) {
 			// Check if token is expired and refresh if needed.
 			if ( ! empty( $tokens['expires_at'] ) && time() >= ( $tokens['expires_at'] - 300 ) ) {
-				$refreshed = $this->refresh_access_token();
-				if ( $refreshed ) {
-					$tokens = get_option( 'pmprocc_tokens', array() );
+				$this->refresh_access_token();
+				// Re-read rather than reusing the stale array: a rejected refresh
+				// token deletes the option via disconnect(), and that disconnected
+				// state must not be overwritten below.
+				$tokens = get_option( 'pmprocc_tokens', array() );
+				if ( empty( $tokens['access_token'] ) ) {
+					return;
 				}
 			}
 			$this->access_token = $tokens['access_token'];
@@ -126,10 +130,12 @@ class PMPro_Constant_Contact_API {
 		$verifier  = wp_generate_password( 64, false );
 		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 
-		// Store verifier and state for callback validation.
+		// Store verifier and state for callback validation. Keyed per user so two
+		// admins connecting at the same time don't clobber each other's pending
+		// authorization.
 		$state = wp_generate_password( 32, false );
-		set_transient( 'pmprocc_oauth_verifier', $verifier, HOUR_IN_SECONDS );
-		set_transient( 'pmprocc_oauth_state', $state, HOUR_IN_SECONDS );
+		set_transient( 'pmprocc_oauth_verifier_' . get_current_user_id(), $verifier, HOUR_IN_SECONDS );
+		set_transient( 'pmprocc_oauth_state_' . get_current_user_id(), $state, HOUR_IN_SECONDS );
 
 		$redirect_uri = admin_url( 'admin.php?page=pmpro-constantcontact&pmprocc_oauth_callback=1' );
 
@@ -221,6 +227,16 @@ class PMPro_Constant_Contact_API {
 			// Only disconnect if the refresh token itself was rejected.
 			// Keep tokens on transient failures (network issues, 5xx) so we can retry later.
 			if ( ! empty( $body['error'] ) && 'invalid_grant' === $body['error'] ) {
+				// Constant Contact rotates refresh tokens, so invalid_grant can also
+				// mean a concurrent process (e.g. an Action Scheduler worker) just
+				// consumed the token we sent and stored a new one. If the stored
+				// tokens changed while we were refreshing, adopt them instead of
+				// disconnecting the site.
+				$latest = get_option( 'pmprocc_tokens', array() );
+				if ( ! empty( $latest['access_token'] ) && ! empty( $latest['refresh_token'] ) && $latest['refresh_token'] !== $tokens['refresh_token'] ) {
+					$this->access_token = $latest['access_token'];
+					return true;
+				}
 				$this->disconnect();
 			}
 			return false;
@@ -367,6 +383,18 @@ class PMPro_Constant_Contact_API {
 			}
 		}
 
+		// Handle 429 — wait out the rate limit (capped) and retry once.
+		if ( 429 === $code ) {
+			$retry_after = (int) wp_remote_retrieve_header( $response, 'retry-after' );
+			sleep( min( max( $retry_after, 1 ), 5 ) );
+			$response = wp_remote_request( $url, $args );
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
+			$code = wp_remote_retrieve_response_code( $response );
+			$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		}
+
 		if ( $code < 200 || $code >= 300 ) {
 			$error_message = $this->parse_error_message( $data, $code );
 			pmprocc_log( "API error ({$method} {$endpoint}): {$error_message}" );
@@ -511,9 +539,8 @@ class PMPro_Constant_Contact_API {
 			if ( ! empty( $result['lists'] ) ) {
 				foreach ( $result['lists'] as $list ) {
 					$all_lists[] = array(
-						'list_id'       => $list['list_id'],
-						'name'          => $list['name'],
-						'member_count'  => ! empty( $list['membership_count'] ) ? $list['membership_count'] : 0,
+						'list_id' => $list['list_id'],
+						'name'    => $list['name'],
 					);
 				}
 			}
