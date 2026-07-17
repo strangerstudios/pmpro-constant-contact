@@ -1,3 +1,5 @@
+![](pmpro-constant-contact-banner.png)
+
 # [Paid Memberships Pro - Constant Contact Add On](https://www.paidmembershipspro.com/add-ons/pmpro-constant-contact/) #
 
 ![License](https://img.shields.io/badge/license-GPL--2.0%2B-red.svg?style=flat-square)
