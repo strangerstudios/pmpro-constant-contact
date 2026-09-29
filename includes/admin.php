@@ -397,7 +397,7 @@ function pmprocc_render_checkbox_list( $name, $items, $selected, $id_key ) {
 			'<label><input type="checkbox" name="%s" value="%s"%s /> %s</label><br/>',
 			esc_attr( $name ),
 			esc_attr( $id ),
-			$checked,
+			$checked, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Hardcoded ' checked' attribute or empty string.
 			esc_html( $label )
 		);
 	}
@@ -408,20 +408,24 @@ function pmprocc_render_checkbox_list( $name, $items, $selected, $id_key ) {
  * Display admin notices.
  */
 function pmprocc_admin_notices() {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only flag used to display a notice.
 	if ( ! empty( $_GET['settings-updated'] ) ) {
 		echo '<div class="notice notice-success"><p>' . esc_html__( 'Settings saved.', 'pmpro-constant-contact' ) . '</p></div>';
 	}
 
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only flag used to display a notice.
 	if ( ! empty( $_GET['pmprocc_connected'] ) ) {
 		echo '<div class="notice notice-success"><p>' . esc_html__( 'Successfully connected to Constant Contact!', 'pmpro-constant-contact' ) . '</p></div>';
 	}
 
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only flag used to display a notice.
 	if ( ! empty( $_GET['pmprocc_disconnected'] ) ) {
 		echo '<div class="notice notice-info"><p>' . esc_html__( 'Disconnected from Constant Contact.', 'pmpro-constant-contact' ) . '</p></div>';
 	}
 
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only error code used to display a notice.
 	if ( ! empty( $_GET['pmprocc_error'] ) ) {
-		$error = sanitize_text_field( wp_unslash( $_GET['pmprocc_error'] ) );
+		$error = sanitize_text_field( wp_unslash( $_GET['pmprocc_error'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only error code mapped to a fixed message.
 		$messages = array(
 			'oauth_denied'    => __( 'Authorization was denied. Please try again.', 'pmpro-constant-contact' ),
 			'state_mismatch'  => __( 'Security validation failed. Please try connecting again.', 'pmpro-constant-contact' ),
