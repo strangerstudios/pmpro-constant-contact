@@ -4,7 +4,7 @@ Tags: pmpro, constant contact, email marketing, membership, sync
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.1
+Stable tag: 2.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -63,6 +63,9 @@ Level-specific tags are removed (if tag removal is enabled). The contact remains
 Constant Contact tags are account-wide and can be used to filter recipients when sending an email, so a single list plus per-level tags keeps members segmented without maintaining multiple lists. Note: accounts with more than 10,000 contacts cannot filter by tag at send time and must use a custom segment instead (active custom segments are limited on the Lite and Standard plans).
 
 == Changelog ==
+
+= 2.0.2 - 2026-11-19 =
+* BUG FIX: Fixed an issue where connecting to Constant Contact could fail with a state mismatch if another plugin filters `random_password`. #21 (@dparker1005)
 
 = 2.0.1 - 2026-09-29 =
 * SECURITY: Improved sanitization and escaping throughout the plugin to resolve Plugin Check security findings. #19 (@dparker1005)
