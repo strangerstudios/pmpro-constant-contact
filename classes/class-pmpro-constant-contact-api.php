@@ -127,13 +127,13 @@ class PMPro_Constant_Contact_API {
 		}
 
 		// Generate PKCE verifier and challenge.
-		$verifier  = wp_generate_password( 64, false );
+		$verifier  = bin2hex( random_bytes( 32 ) );
 		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 
 		// Store verifier and state for callback validation. Keyed per user so two
 		// admins connecting at the same time don't clobber each other's pending
 		// authorization.
-		$state = wp_generate_password( 32, false );
+		$state = bin2hex( random_bytes( 16 ) );
 		set_transient( 'pmprocc_oauth_verifier_' . get_current_user_id(), $verifier, HOUR_IN_SECONDS );
 		set_transient( 'pmprocc_oauth_state_' . get_current_user_id(), $state, HOUR_IN_SECONDS );
 
