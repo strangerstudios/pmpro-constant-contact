@@ -66,6 +66,24 @@ function pmprocc_activation() {
 register_activation_hook( __FILE__, 'pmprocc_activation' );
 
 /**
+ * Merge the default options for sites updated in place from 1.x.
+ *
+ * The activation hook doesn't run on plugin updates, so a 1.x site keeps its
+ * old pmprocc_options without the 2.0 keys. sync_profile_update is always set
+ * by activation and by saving the full settings form, so its absence means the
+ * 2.0 defaults were never applied.
+ *
+ * @since TBD
+ */
+function pmprocc_maybe_set_default_options() {
+	$options = get_option( 'pmprocc_options' );
+	if ( is_array( $options ) && ! array_key_exists( 'sync_profile_update', $options ) ) {
+		pmprocc_activation();
+	}
+}
+add_action( 'admin_init', 'pmprocc_maybe_set_default_options' );
+
+/**
  * Add plugin action links.
  */
 function pmprocc_plugin_action_links( $links ) {
